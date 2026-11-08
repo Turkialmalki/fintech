@@ -1,4 +1,4 @@
-# MCP server (`mcp_server/rip_mcp`)
+# MCP server (`backend/rip_mcp`)
 
 Built on the official Python MCP SDK (`mcp==2.3.0`, `mcp.server.mcpserver.MCPServer`). It exposes **controlled**
 application capabilities — each tool maps to a deterministic service with a Pydantic input model, a required permission
@@ -19,8 +19,8 @@ and a read/write flag (`backend/app/services/tools.py`). There is no generic SQL
 
 ## Run
 ```bash
-cd backend && PYTHONPATH=.:../mcp_server python -m rip_mcp --transport streamable-http --port 8765   # http://host:8765/mcp, /healthz
-PYTHONPATH=.:../mcp_server RIP_MCP_API_KEY=rip_... python -m rip_mcp --transport stdio
+cd backend && PYTHONPATH=. python -m rip_mcp --transport streamable-http --port 8765   # http://host:8765/mcp, /healthz
+PYTHONPATH=. RIP_MCP_API_KEY=rip_... python -m rip_mcp --transport stdio
 docker compose up mcp
 ```
 
@@ -38,7 +38,7 @@ docker compose up mcp
 ```
 ```json
 { "mcpServers": { "rip": { "command": "python", "args": ["-m", "rip_mcp", "--transport", "stdio"],
-  "env": { "RIP_MCP_API_KEY": "rip_...", "DATABASE_URL": "postgresql+psycopg://...", "PYTHONPATH": "/path/backend:/path/mcp_server" } } } }
+  "env": { "RIP_MCP_API_KEY": "rip_...", "DATABASE_URL": "postgresql+psycopg://...", "PYTHONPATH": "/path/backend" } } } }
 ```
 
 Python client:

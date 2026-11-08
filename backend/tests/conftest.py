@@ -14,7 +14,6 @@ os.environ["RATE_LIMIT_PER_MINUTE"] = "100000"
 os.environ["MCP_RATE_LIMIT_PER_MINUTE"] = "100000"
 os.environ["LOG_LEVEL"] = "WARNING"
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT.parent / "mcp_server"))
 
 import pytest  # noqa: E402
 from alembic import command  # noqa: E402

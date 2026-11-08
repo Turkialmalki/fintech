@@ -6,8 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libpq5 curl && 
 COPY backend/requirements.txt .
 RUN pip install -r requirements.txt
 COPY backend/ /app/
-COPY mcp_server/ /mcp_server/
-ENV PYTHONPATH=/app:/mcp_server STORAGE_DIR=/data/storage
+ENV PYTHONPATH=/app STORAGE_DIR=/data/storage
 RUN useradd --uid 10001 --create-home rip && mkdir -p /data/storage && chown -R rip /data
 USER 10001
 EXPOSE 8000

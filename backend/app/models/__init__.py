@@ -23,6 +23,7 @@ from app.models.governance import (  # noqa: F401
     ModelEvaluation,
     ModelInvocation,
     RequestMetric,
+    StoredObject,
 )
 from app.models.identity import McpApiKey, Organization, Permission, Role, SystemSetting, User  # noqa: F401
 from app.models.regulatory import (  # noqa: F401

@@ -14,7 +14,7 @@ log = logging.getLogger("rip.ratelimit")
 
 class RateLimiter:
     def __init__(self, url: str):
-        self._redis = redis.Redis.from_url(url, socket_connect_timeout=0.5, socket_timeout=0.5)
+        self._redis = redis.Redis.from_url(url, socket_connect_timeout=0.5, socket_timeout=0.5) if url else None
         self._local: dict[str, tuple[int, int]] = {}
         self._lock = threading.Lock()
         self._redis_ok: bool | None = None
@@ -32,6 +32,8 @@ class RateLimiter:
         """Returns True when the request is allowed."""
         window = int(time.time() // period)
         rkey = f"rl:{key}:{window}"
+        if self._redis is None:
+            return self._local_hit(rkey, window) <= limit
         try:
             pipe = self._redis.pipeline()
             pipe.incr(rkey)
@@ -46,6 +48,8 @@ class RateLimiter:
         return count <= limit
 
     def healthy(self) -> bool:
+        if self._redis is None:
+            return False
         try:
             return bool(self._redis.ping())
         except redis.RedisError:

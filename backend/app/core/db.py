@@ -13,7 +13,35 @@ class Base(DeclarativeBase):
     pass
 
 
-engine = create_engine(settings.database_url, pool_pre_ping=True, pool_size=10, max_overflow=20, future=True)
+def _engine_kwargs() -> dict:
+    if settings.serverless:
+        # Serverless + transaction pooler (PgBouncer/Supavisor): no local pool, no server-side prepared statements.
+        from sqlalchemy.pool import NullPool
+
+        return {"poolclass": NullPool, "connect_args": {"prepare_threshold": None, "connect_timeout": 10}}
+    return {"pool_pre_ping": True, "pool_size": 10, "max_overflow": 20}
+
+
+def _resolve_url() -> str:
+    """DATABASE_URL may list alternatives separated by '|' (e.g. pooler hosts); the first reachable one wins."""
+    candidates = [u.strip() for u in settings.database_url.split("|") if u.strip()]
+    if len(candidates) == 1:
+        return candidates[0]
+    last: Exception | None = None
+    for url in candidates:
+        try:
+            probe = create_engine(url, **_engine_kwargs())
+            with probe.connect() as c:
+                c.execute(text("SELECT 1"))
+            probe.dispose()
+            return url
+        except Exception as e:  # try the next candidate
+            last = e
+    raise RuntimeError(f"no database URL candidate is reachable: {last}")
+
+
+DATABASE_URL = _resolve_url()
+engine = create_engine(DATABASE_URL, future=True, **_engine_kwargs())
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 

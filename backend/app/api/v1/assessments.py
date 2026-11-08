@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.agents.graph import GRAPH_DESCRIPTION, create_run, execute_run
 from app.api.deps import require
+from app.core.config import settings
 from app.core.db import get_db
 from app.core.errors import NotFound
 from app.core.security import Principal
@@ -68,6 +69,10 @@ def review_out(r: AnalystReview) -> dict:
 @router.post("/assessments/run", status_code=202)
 def run_assessment(body: RunIn, p: Principal = Depends(require("assessments:run"))):
     run_id = create_run(p, body.application_id)
+    if settings.agent_run_mode == "sync":
+        # Serverless: no work may outlive the request, so the run completes before responding.
+        execute_run(run_id, p)
+        return {"run_id": str(run_id), "status": "COMPLETED_SYNC"}
     # Background execution (in production this is a worker; the in-process thread keeps the demo self-contained).
     threading.Thread(target=execute_run, args=(run_id, p), daemon=True, name=f"agent-run-{run_id}").start()
     return {"run_id": str(run_id), "status": "QUEUED"}

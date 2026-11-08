@@ -57,8 +57,33 @@ class S3Storage(Storage):
         return self.client.get_object(Bucket=self.bucket, Key=key)["Body"].read()
 
 
+class DatabaseStorage(Storage):
+    """Stores objects in PostgreSQL (stored_objects). For serverless demos without an object store."""
+
+    def put(self, key: str, data: bytes) -> str:
+        from app.core.db import session_scope
+        from app.models import StoredObject
+
+        with session_scope() as db:
+            db.merge(StoredObject(key=key, data=data, size_bytes=len(data)))
+        return key
+
+    def get(self, key: str) -> bytes:
+        from app.core.db import session_scope
+        from app.models import StoredObject
+
+        with session_scope() as db:
+            obj = db.get(StoredObject, key)
+            if obj is None:
+                raise FileNotFoundError(key)
+            return bytes(obj.data)
+
+
 def get_storage() -> Storage:
-    if os.getenv("STORAGE_BACKEND", "local") == "s3":
+    backend = os.getenv("STORAGE_BACKEND", "local")
+    if backend == "db":
+        return DatabaseStorage()
+    if backend == "s3":
         return S3Storage(os.environ["S3_BUCKET"])
     return LocalStorage(settings.storage_dir)
 

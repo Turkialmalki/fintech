@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -120,3 +120,13 @@ class RequestMetric(UUIDPk, Base):
     route: Mapped[str] = mapped_column(String(200), index=True)
     status_code: Mapped[int] = mapped_column(Integer)
     latency_ms: Mapped[float] = mapped_column(Float)
+
+
+class StoredObject(Base):
+    """Object storage fallback (STORAGE_BACKEND=db)."""
+
+    __tablename__ = "stored_objects"
+    key: Mapped[str] = mapped_column(String(400), primary_key=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=__import__("sqlalchemy").func.now())

@@ -42,7 +42,7 @@ Demo accounts (password `Demo@2026!`): `analyst@rip.demo`, `supervisor@rip.demo`
 python -m venv .venv && . .venv/bin/activate
 pip install -r backend/requirements-dev.txt
 cd backend
-export DATABASE_URL=postgresql+psycopg://rip:rip@localhost:5432/rip PYTHONPATH=.:../mcp_server
+export DATABASE_URL=postgresql+psycopg://rip:rip@localhost:5432/rip PYTHONPATH=.
 alembic upgrade head
 python -m app.seed.run --reset           # synthetic data + runs the real agent workflow for 4 applications
 uvicorn app.main:app --reload --port 8000

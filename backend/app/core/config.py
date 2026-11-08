@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:3000"
     demo_mode: bool = True  # enables synthetic data banner & seed endpoint
+    # Serverless (e.g. Vercel): no connection pooling in-process, no background threads, self-bootstrap.
+    serverless: bool = Field(default_factory=lambda: bool(__import__("os").getenv("VERCEL")))
+    auto_bootstrap: bool = False  # run migrations + demo seed on first request if the database is empty
 
     # --- database / cache ---
     database_url: str = "postgresql+psycopg://rip:rip@localhost:5432/rip"
@@ -67,6 +70,7 @@ class Settings(BaseSettings):
     agent_token_budget: int = 60000
     agent_retry_attempts: int = 2
     agent_tool_transport: Literal["mcp_inprocess", "mcp_http"] = "mcp_inprocess"
+    agent_run_mode: Literal["thread", "sync"] = "thread"  # "sync" for serverless platforms
     mcp_url: str = "http://localhost:8765/mcp"
 
     # --- MCP server ---

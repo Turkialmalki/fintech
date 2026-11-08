@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libpq5 curl && 
 COPY backend/requirements.txt .
 RUN pip install -r requirements.txt
 COPY backend/app /srv/app
-COPY mcp_server/rip_mcp /srv/rip_mcp
+COPY backend/rip_mcp /srv/rip_mcp
 ENV PYTHONPATH=/srv
 RUN useradd --uid 10001 rip
 USER 10001

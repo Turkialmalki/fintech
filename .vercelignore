@@ -1,0 +1,10 @@
+.venv
+**/node_modules
+**/.next
+**/__pycache__
+backend/tests
+backend/.test-storage
+storage
+docs/screenshots
+e2e
+infra
