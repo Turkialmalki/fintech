@@ -22,6 +22,7 @@ from app.models import (
     AIModel,
     AIUseCase,
     AnalystReview,
+    RegulatoryRequirement,
     ApplicationStatus as S,
     AssessmentCitation,
     AssessmentDraft,
@@ -346,7 +347,9 @@ def dashboard(p: Principal = Depends(require("applications:read")), db: Session 
                         .order_by(AssessmentFinding.created_at.desc()).limit(6)).all()
     activity = db.scalars(select(AuditLog).where(AuditLog.org_id == org, AuditLog.category.in_(["APPLICATION", "REVIEW", "AGENT", "DOCUMENT"]))
                           .order_by(AuditLog.created_at.desc()).limit(10)).all()
+    insights = _insights(db, org, base, latest_drafts)
     return {
+        "insights": insights,
         "synthetic": False,
         "kpis": {"total_applications": total, "under_review": under_review, "completed_assessments": completed,
                  "requires_information": by_status.get("ADDITIONAL_INFORMATION_REQUIRED", 0), "risk_indicators": risk_ind,
@@ -438,6 +441,68 @@ def observability(p: Principal = Depends(require("audit:read")), db: Session = D
         "human_corrections": {"reviewed_findings": reviewed, "edited": fs.get("EDITED", 0), "dismissed": fs.get("DISMISSED", 0),
                               "correction_rate": round((fs.get("EDITED", 0) + fs.get("DISMISSED", 0)) / reviewed, 4) if reviewed else None},
         "evaluations": [{"id": str(e.id), "created_at": e.created_at, "model": e.model_name, "metrics": e.metrics, "is_mock": e.is_mock} for e in evals],
+    }
+
+
+def _insights(db: Session, org, base, latest_drafts) -> dict:
+    """Portfolio analytics computed from live data (latest draft per application)."""
+    from app.services import rules as rules_svc
+
+    apps_by_id = {a.id: a for a in db.scalars(select(FintechApplication).where(*base))}
+    drafts = [d for d in latest_drafts if d.application_id in apps_by_id]
+    gap_rows = db.execute(select(AssessmentFinding.draft_id, AssessmentFinding.requirement_code, AssessmentFinding.title_ar,
+                                 AssessmentFinding.title_en, AssessmentFinding.category)
+                          .where(AssessmentFinding.draft_id.in_([d.id for d in drafts]),
+                                 AssessmentFinding.category.in_(["GAP", "MISSING_INFORMATION"]))).all()
+    gaps_by_draft: dict = {}
+    top: dict[str, dict] = {}
+    for draft_id, code, tar, ten, _cat in gap_rows:
+        if not code:
+            continue
+        gaps_by_draft.setdefault(draft_id, set()).add(code)
+        req = db.scalar(select(RegulatoryRequirement).where(RegulatoryRequirement.org_id == org, RegulatoryRequirement.code == code))
+        e = top.setdefault(code, {"code": code, "title_ar": req.title_ar if req else tar, "title_en": req.title_en if req else ten, "count": 0})
+        e["count"] += 1
+    readiness: dict[str, list[float]] = {}
+    for d in drafts:
+        app = apps_by_id[d.application_id]
+        n = len(rules_svc.requirements_for(db, app)) or 1
+        readiness.setdefault(app.service_category.value, []).append(100 * (n - len(gaps_by_draft.get(d.id, set()))) / n)
+    submitted = [a for a in apps_by_id.values() if a.status != S.DRAFT]
+    present: dict[str, int] = {}
+    for a in submitted:
+        for t in {doc.document_type.value for doc in a.documents if doc.processing_status == "PROCESSED" and doc.deleted_at is None}:
+            present[t] = present.get(t, 0) + 1
+    months: dict[str, dict] = {}
+    now = datetime.now(timezone.utc)
+    for i in range(5, -1, -1):
+        y, mo = divmod(now.year * 12 + now.month - 1 - i, 12)
+        m = f"{y:04d}-{mo + 1:02d}"
+        months[m] = {"month": m, "submitted": 0, "approved": 0, "info": 0}
+    for a in submitted:
+        m = a.created_at.strftime("%Y-%m")
+        if m in months:
+            months[m]["submitted"] += 1
+            if a.status in (S.APPROVED_FOR_NEXT_REVIEW_STAGE, S.CLOSED):
+                months[m]["approved"] += 1
+            elif a.status == S.ADDITIONAL_INFORMATION_REQUIRED:
+                months[m]["info"] += 1
+    decisions = dict(db.execute(select(AnalystReview.decision, func.count()).where(AnalystReview.org_id == org)
+                                .group_by(AnalystReview.decision)).all())
+    cities: dict[str, int] = {}
+    for a in apps_by_id.values():
+        if a.city:
+            cities[a.city] = cities.get(a.city, 0) + 1
+    all_scores = [s for v in readiness.values() for s in v]
+    return {
+        "avg_readiness": round(sum(all_scores) / len(all_scores)) if all_scores else None,
+        "readiness_by_category": {k: round(sum(v) / len(v)) for k, v in readiness.items()},
+        "top_gaps": sorted(top.values(), key=lambda e: -e["count"])[:6],
+        "doc_coverage": {t: round(100 * c / len(submitted)) for t, c in present.items()} if submitted else {},
+        "monthly": list(months.values()),
+        "decisions": decisions,
+        "cities": dict(sorted(cities.items(), key=lambda kv: -kv[1])[:6]),
+        "assessed": len(drafts),
     }
 
 

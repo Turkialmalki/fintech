@@ -202,7 +202,8 @@ def execute(name: str, arguments: dict, principal: Principal, *, transport: str 
     t0 = time.perf_counter()
     base = dict(category="MCP", principal=principal, resource_type="mcp_tool", resource_id=name)
     try:
-        if not limiter.hit(f"mcp:{principal.user_id}", settings.mcp_rate_limit_per_minute):
+        # External MCP clients are rate limited; in-platform agents are bounded by their per-run tool budget instead.
+        if principal.actor_type != "AGENT" and not limiter.hit(f"mcp:{principal.user_id}", settings.mcp_rate_limit_per_minute):
             raise ToolError("Rate limit exceeded", "تم تجاوز حد الاستدعاءات", status_code=429, code="RATE_LIMITED")
         if not principal.has(spec.permission):
             raise Forbidden(details={"tool": name, "missing_permissions": [spec.permission]})

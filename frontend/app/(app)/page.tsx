@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
-import { HBars, Strip, TrendLine } from "@/components/charts/charts";
+import { Donut, GroupedBars, HBars, PercentBars, TrendLine } from "@/components/charts/charts";
 import { MockTag, Severity } from "@/components/domain/badges";
 import { Select, Segmented } from "@/components/ui/field";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/feedback";
@@ -19,6 +19,9 @@ type Summary = {
   workload: { user_id: string; name_ar: string; name_en: string; open: number; pending_review: number }[];
   ai: { invocations: number; avg_latency_ms: number | null; tokens: number; cost_usd: number; runs: number; citation_verification_rate: number | null; is_mock: boolean };
   recent_findings: { id: string; severity: string; category: string; title_ar: string; title_en: string; application_id: string; reference: string; company_name_ar: string; company_name_en: string }[];
+  insights: { avg_readiness: number | null; readiness_by_category: Record<string, number>; top_gaps: { code: string; title_ar: string; title_en: string; count: number }[];
+    doc_coverage: Record<string, number>; monthly: { month: string; submitted: number; approved: number; info: number }[];
+    decisions: Record<string, number>; cities: Record<string, number>; assessed: number };
   activity: { id: string; action: string; category: string; created_at: string; actor_type: string; actor_name_ar: string | null; actor_name_en: string | null }[];
 };
 
@@ -26,6 +29,8 @@ const STATUS_COLORS: Record<string, string> = {
   DRAFT: "#B7C2D1", SUBMITTED: "#2457D6", DOCUMENT_PROCESSING: "#8C9CF0", AI_ANALYSIS: "#6479E8", PENDING_HUMAN_REVIEW: "#D99024",
   ADDITIONAL_INFORMATION_REQUIRED: "#D94B52", APPROVED_FOR_NEXT_REVIEW_STAGE: "#15966A", CLOSED: "#68778B",
 };
+const CAT_COLORS: Record<string, string> = { BNPL: "#2457D6", DIGITAL_PAYMENTS: "#6479E8", DIGITAL_WALLET: "#15966A", OPEN_BANKING: "#D99024", LENDING: "#C8414A" };
+const DECISION_COLORS: Record<string, string> = { APPROVE_FOR_NEXT_STAGE: "#15966A", REQUEST_INFORMATION: "#D99024", COMMENT: "#6479E8", RETURN: "#68778B", REJECT: "#D94B52" };
 const RISK_COLORS: Record<string, string> = { CRITICAL: "#B4232A", HIGH: "#D94B52", MEDIUM: "#D99024", LOW: "#15966A", UNDETERMINED: "#B7C2D1" };
 
 function Kpi({ label, value, hint, href }: { label: string; value: React.ReactNode; hint?: string; href?: string }) {
@@ -98,13 +103,49 @@ export default function Dashboard() {
             </Panel>
             <Panel title={t.dashboard.byStatus}>
               {!d ? <Skeleton className="h-40" /> : (
-                <div className="flex flex-col gap-6">
-                  <Strip parts={Object.keys(labels.status).map((s) => ({ label: label("status", s), value: d.by_status[s] ?? 0, color: STATUS_COLORS[s] }))} />
-                  <div>
-                    <p className="mb-2.5 text-[12.5px] text-muted">{t.dashboard.riskDist}</p>
-                    <Strip parts={["HIGH", "MEDIUM", "LOW"].map((r) => ({ label: label("severity", r), value: d.risk_distribution[r] ?? 0, color: RISK_COLORS[r] }))} />
-                  </div>
-                </div>
+                <Donut centerLabel={pick("طلب", "applications")}
+                  parts={Object.keys(labels.status).filter((s) => d.by_status[s]).map((s) => ({ label: label("status", s), value: d.by_status[s] ?? 0, color: STATUS_COLORS[s] }))} />
+              )}
+            </Panel>
+          </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+            <Panel title={pick("التدفق الشهري للطلبات", "Monthly application flow")} description={pick("آخر 6 أشهر", "Last 6 months")} className="xl:col-span-1 lg:col-span-2">
+              {!d ? <Skeleton className="h-56" /> : (
+                <GroupedBars x="label" data={d.insights.monthly.map((m) => ({ ...m, label: new Date(m.month + "-01").toLocaleDateString(locale === "ar" ? "ar-SA-u-nu-latn-ca-gregory" : "en-US", { month: "short" }) }))}
+                  series={[{ key: "submitted", label: pick("مقدَّمة", "Submitted"), color: "#2457D6" }, { key: "approved", label: pick("محالة للمرحلة التالية", "Advanced"), color: "#15966A" },
+                    { key: "info", label: pick("بانتظار استكمال", "Awaiting info"), color: "#D99024" }]} />
+              )}
+            </Panel>
+            <Panel title={t.dashboard.byCategory}>
+              {!d ? <Skeleton className="h-40" /> : (
+                <Donut centerLabel={pick("طلب", "applications")}
+                  parts={Object.keys(labels.category).map((c) => ({ label: label("category", c), value: d.by_category[c] ?? 0, color: CAT_COLORS[c] }))} />
+              )}
+            </Panel>
+            <Panel title={t.dashboard.riskDist} description={pick("حسب آخر تقييم لكل طلب", "Latest assessment per application")}>
+              {!d ? <Skeleton className="h-40" /> : (
+                <Donut centerLabel={pick("تقييم", "assessed")}
+                  parts={["HIGH", "MEDIUM", "LOW"].map((r) => ({ label: label("severity", r), value: d.risk_distribution[r] ?? 0, color: RISK_COLORS[r] }))} />
+              )}
+            </Panel>
+          </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+            <Panel title={pick("متوسط الجاهزية حسب النشاط", "Average readiness by activity")}
+              actions={d?.insights.avg_readiness != null && <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-[12.5px] font-semibold text-primary num">{pick("الإجمالي", "Overall")} {d.insights.avg_readiness}%</span>}>
+              {!d ? <Skeleton className="h-40" /> : (
+                <PercentBars data={Object.entries(d.insights.readiness_by_category).sort((a, b) => b[1] - a[1]).map(([c, v]) => ({ label: label("category", c), value: v }))} />
+              )}
+            </Panel>
+            <Panel title={pick("أكثر الفجوات تكراراً", "Most common gaps")} description={pick("عدد الطلبات التي ظهرت فيها الفجوة", "Applications where the gap appears")}>
+              {!d ? <Skeleton className="h-40" /> : d.insights.top_gaps.length === 0 ? <EmptyState title={t.common.emptyTitle} /> : (
+                <HBars data={d.insights.top_gaps.map((g) => ({ label: pick(g.title_ar, g.title_en), value: g.count, color: "#D94B52" }))} />
+              )}
+            </Panel>
+            <Panel title={pick("اكتمال الوثائق المقدَّمة", "Document coverage")} description={pick("نسبة الطلبات المقدَّمة التي أرفقت كل وثيقة", "Share of submitted applications with each document")}>
+              {!d ? <Skeleton className="h-40" /> : (
+                <PercentBars data={Object.entries(d.insights.doc_coverage).filter(([k]) => k !== "OTHER").sort((a, b) => b[1] - a[1]).slice(0, 7).map(([k, v]) => ({ label: label("docType", k), value: v }))} />
               )}
             </Panel>
           </div>
@@ -153,9 +194,16 @@ export default function Dashboard() {
                 <HBars data={d.workload.map((w) => ({ label: pick(w.name_ar, w.name_en), value: w.open }))} />
               )}
             </Panel>
-            <Panel title={t.dashboard.byCategory}>
+            <Panel title={pick("قرارات المراجعة البشرية", "Human review decisions")}>
               {!d ? <Skeleton className="h-32" /> : (
-                <HBars data={Object.keys(labels.category).map((c) => ({ label: label("category", c), value: d.by_category[c] ?? 0, color: "#6479E8" }))} />
+                <Donut size={140} centerLabel={pick("قرار", "decisions")}
+                  parts={Object.entries(d.insights.decisions).map(([k, v]) => ({ label: label("decision", k), value: v, color: DECISION_COLORS[k] ?? "#98A4B5" }))} />
+              )}
+              {d && Object.keys(d.insights.cities).length > 0 && (
+                <div className="mt-5 border-t border-line pt-4">
+                  <p className="mb-3 text-[12.5px] text-muted">{pick("الطلبات حسب المدينة", "Applications by city")}</p>
+                  <HBars data={Object.entries(d.insights.cities).map(([c, v]) => ({ label: c, value: v, color: "#6479E8" }))} />
+                </div>
               )}
             </Panel>
             <Panel title={t.dashboard.activity} bodyClass="px-5 py-3">

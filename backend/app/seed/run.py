@@ -36,6 +36,7 @@ from app.models import (
 )
 from app.rag.index import ingest_regulatory_document
 from app.seed.companies import COMPANIES, REQUIREMENTS
+from app.seed.portfolio import portfolio
 from app.seed.version import SEED_VERSION
 from app.services import applications as apps
 
@@ -52,7 +53,7 @@ USERS = {
     "analyst2": ("lama.alshehri", "لمى الشهري", "Lama Alshehri", "محللة امتثال", "Compliance analyst", ["analyst"]),
     "auditor": ("majed.alzahrani", "ماجد الزهراني", "Majed Alzahrani", "مدقق داخلي", "Internal auditor", ["auditor"]),
     "viewer": ("hessa.alghamdi", "حصة الغامدي", "Hessa Alghamdi", "إدارة المخاطر — اطلاع", "Risk management (read-only)", ["viewer"]),
-    "guest": ("reviewer", "حساب التجربة", "Guest Reviewer", "محلل امتثال (تجربة)", "Compliance analyst (trial)", ["analyst"]),
+    "guest": ("reviewer", "زائر المنصة", "Guest Reviewer", "محلل امتثال (تجربة)", "Compliance analyst (trial)", ["analyst"]),
 }
 
 
@@ -239,23 +240,26 @@ def seed_governance(db, org) -> None:
     db.add(SystemSetting(org_id=None, key="seed.version", value={"value": SEED_VERSION}, description="Seeded content version."))
 
 
+def all_companies() -> list[dict]:
+    base = [{**c, "days_ago": 40 - i * 6, "assignee": "analyst" if i % 2 == 0 else "analyst2"} for i, c in enumerate(COMPANIES)]
+    return base + portfolio()
+
+
 def seed_applications(db, ctx) -> dict:
     org, users = ctx["org"], ctx["users"]
     analyst = users["analyst"]
     p = principal_from_user(analyst)
     created = {}
-    now = datetime.now(timezone.utc)
-    for i, c in enumerate(COMPANIES):
+    for c in all_companies():
         existing = db.scalar(select(FintechApplication).where(FintechApplication.org_id == org.id,
                                                               FintechApplication.company_name_en == c["company_name_en"]))
         if existing:
             created[c["key"]] = existing
             continue
-        fields = {k: v for k, v in c.items() if k not in ("key", "documents", "status")}
+        fields = {k: v for k, v in c.items() if k not in ("key", "documents", "status", "outcome", "days_ago", "assignee")}
         fields["service_category"] = ServiceCategory(fields["service_category"])
         a = FintechApplication(org_id=org.id, reference=apps.new_reference(db), created_by_id=analyst.id, is_synthetic=False,
-                               assigned_analyst_id=(users["analyst"] if i % 2 == 0 else users["analyst2"]).id, **fields)
-        a.created_at = now - timedelta(days=40 - i * 6)
+                               assigned_analyst_id=users.get(c["assignee"], analyst).id, **fields)
         db.add(a)
         db.flush()
         apps.event(db, a, p, "CREATED")
@@ -268,32 +272,106 @@ def seed_applications(db, ctx) -> dict:
     return created
 
 
+DOC_AR = {"COMMERCIAL_REGISTRATION": "السجل التجاري", "BUSINESS_PLAN": "خطة العمل", "FINANCIAL_STATEMENTS": "القوائم المالية المدققة",
+          "AML_CTF_POLICY": "سياسة مكافحة غسل الأموال", "CYBERSECURITY_POLICY": "سياسة الأمن السيبراني",
+          "DATA_PROTECTION_POLICY": "سياسة حماية البيانات الشخصية", "GOVERNANCE_STRUCTURE": "هيكل الحوكمة",
+          "OUTSOURCING_AGREEMENTS": "اتفاقيات الإسناد", "CONSUMER_PROTECTION_POLICY": "سياسة حماية العملاء",
+          "RISK_MANAGEMENT_FRAMEWORK": "إطار إدارة المخاطر"}
+
+
 def seed_assessments(ctx, created) -> None:
-    """Runs the REAL agent workflow (MCP + LangGraph) for several applications, then records human decisions."""
+    """Runs the REAL agent workflow (MCP + LangGraph) for the pipeline, then records human decisions.
+
+    Resumable: applications that already have a draft are skipped, so an interrupted bootstrap continues where it stopped.
+    """
     from app.agents.graph import create_run, execute_run
     from app.models import AssessmentDraft
     from app.services import assessments as asmt
+    from app.services import rules
 
+    plan = {"tamweel": "pending", "openbank": "comment", "remit": "approve", "lend": "info"}
+    plan |= {c["key"]: c["outcome"] for c in portfolio() if c["outcome"] in ("approve", "info", "pending", "close")}
     with session_scope() as db:
-        analyst = principal_from_user(db.get(User, ctx["users"]["analyst"].id))
-        supervisor = principal_from_user(db.get(User, ctx["users"]["supervisor"].id))
-    for key in ("tamweel", "openbank", "remit", "lend"):
-        run_id = create_run(analyst, created[key].id)
-        execute_run(run_id, analyst)
+        users = {k: principal_from_user(db.get(User, ctx["users"][k].id)) for k in ctx["users"] if ctx["users"][k] is not None}
+        done = {a for (a,) in db.execute(select(AssessmentDraft.application_id).distinct())}
+    for key in plan:
+        if key in created and created[key].id not in done:
+            run_id = create_run(users["analyst"], created[key].id)
+            execute_run(run_id, users["analyst"])
     with session_scope() as db:
-        def latest(key):
-            return db.scalar(select(AssessmentDraft).where(AssessmentDraft.application_id == created[key].id)
-                             .order_by(AssessmentDraft.version.desc()).limit(1))
-        d = latest("openbank")
-        asmt.decide(db, analyst, d, "COMMENT", "تم التحقق من استشهادات متطلبات الموافقة، بانتظار مراجعة المشرفة.", False)
-        d = latest("remit")
-        asmt.decide(db, supervisor, d, "APPROVE_FOR_NEXT_STAGE", "اكتملت المراجعة الأولية؛ يُحال إلى مرحلة المراجعة التالية.", True)
-        d = latest("lend")
-        asmt.decide(db, analyst, d, "REQUEST_INFORMATION", "يرجى تقديم سياسة حماية العملاء وإطار إدارة المخاطر وهيكل الحوكمة.", True)
+        for key, outcome in plan.items():
+            if key not in created:
+                continue
+            d = db.scalar(select(AssessmentDraft).where(AssessmentDraft.application_id == created[key].id)
+                          .order_by(AssessmentDraft.version.desc()).limit(1))
+            if d is None or d.status != "PENDING_REVIEW":
+                continue
+            app = db.get(FintechApplication, created[key].id)
+            if outcome == "comment":
+                asmt.decide(db, users["analyst"], d, "COMMENT", "تم التحقق من استشهادات متطلبات الموافقة، بانتظار مراجعة المشرفة.", False)
+            elif outcome in ("approve", "close"):
+                asmt.decide(db, users["supervisor"], d, "APPROVE_FOR_NEXT_STAGE",
+                            "اكتملت المراجعة الأولية والوثائق مستوفاة؛ يُحال إلى مرحلة المراجعة التالية.", True)
+                if outcome == "close":
+                    apps.transition(db, users["supervisor"], app, S.CLOSED, reason="اكتملت مراحل المراجعة")
+            elif outcome == "info":
+                missing = [m["document_type"] for m in rules.check_required_documents(db, app)["missing"]]
+                ask = "، ".join(DOC_AR.get(m, m) for m in missing) or "توضيح ضوابط نقل البيانات خارج المملكة"
+                asmt.decide(db, users["analyst"], d, "REQUEST_INFORMATION", f"يرجى تقديم: {ask}.", True)
+    backdate(created)
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM system_settings WHERE key = 'seed.assessed' AND org_id IS NULL"))
+        conn.execute(text("INSERT INTO system_settings (id, org_id, key, value, description, created_at, updated_at) "
+                          "VALUES (gen_random_uuid(), NULL, 'seed.assessed', CAST(:v AS jsonb), 'Seed assessments complete.', now(), now())"),
+                     {"v": '{"value": "%s"}' % SEED_VERSION})
+
+
+def backdate(created) -> None:
+    """Spread the pipeline over its real timeline (seeded objects are created in one go)."""
+    import random
+
+    now = datetime.now(timezone.utc)
+    days = {c["key"]: c["days_ago"] for c in all_companies()}
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE audit_logs SET created_at = :t WHERE action IN ('regulatory_document_indexed', 'regulatory_document_uploaded')"),
+                     {"t": now - timedelta(days=185)})
+        for key, a in created.items():
+            rnd = random.Random(key)
+            t0 = now - timedelta(days=days.get(key, 10), hours=rnd.randint(0, 9))
+            sub = t0 + timedelta(hours=rnd.randint(6, 30))
+            ran = sub + timedelta(hours=rnd.randint(2, 20))
+            rev = ran + timedelta(hours=rnd.randint(18, 90))
+            p = {"id": a.id, "t0": t0, "sub": sub, "ran": ran, "rev": min(rev, now - timedelta(hours=1))}
+            conn.execute(text("UPDATE fintech_applications SET created_at=:t0, updated_at=:rev, "
+                              "submitted_at = CASE WHEN submitted_at IS NULL THEN NULL ELSE :sub END WHERE id=:id"), p)
+            conn.execute(text("UPDATE application_documents SET created_at=:t0, updated_at=:t0 WHERE application_id=:id"), p)
+            conn.execute(text("UPDATE agent_runs SET created_at=:ran, started_at=:ran, "
+                              "finished_at = :ran + (COALESCE(duration_ms,0) * interval '1 millisecond') WHERE application_id=:id"), p)
+            conn.execute(text("UPDATE assessment_drafts SET created_at=:ran, updated_at=:rev WHERE application_id=:id"), p)
+            conn.execute(text("UPDATE assessment_findings f SET created_at=:ran FROM assessment_drafts d "
+                              "WHERE f.draft_id=d.id AND d.application_id=:id"), p)
+            conn.execute(text("UPDATE analyst_reviews SET created_at=:rev WHERE application_id=:id"), p)
+            conn.execute(text("UPDATE application_comments SET created_at=:rev WHERE application_id=:id"), p)
+            conn.execute(text("""UPDATE audit_logs l SET created_at = CASE
+                WHEN l.action IN ('application_created','application_document_uploaded','extracted_profile_stored') THEN :t0
+                WHEN l.action LIKE 'review_%' OR l.action IN ('information_requested','comment_added','analyst_assigned') THEN :rev
+                WHEN l.action = 'status_changed' AND l.details->>'to' IN ('SUBMITTED') THEN :sub
+                WHEN l.action = 'status_changed' AND l.details->>'to' IN ('AI_ANALYSIS','PENDING_HUMAN_REVIEW') THEN :ran
+                WHEN l.action = 'status_changed' THEN :rev
+                ELSE :ran END
+                WHERE l.resource_id = CAST(:id AS text)
+                   OR l.resource_id IN (SELECT CAST(id AS text) FROM assessment_drafts WHERE application_id = :id)
+                   OR l.resource_id IN (SELECT CAST(id AS text) FROM agent_runs WHERE application_id = :id)
+                   OR l.resource_id IN (SELECT CAST(id AS text) FROM application_documents WHERE application_id = :id)"""), p)
+            conn.execute(text("UPDATE audit_logs SET created_at = :ran WHERE details->>'run_id' IN "
+                              "(SELECT CAST(id AS text) FROM agent_runs WHERE application_id = :id)"), p)
+            conn.execute(text("""UPDATE application_events e SET created_at = CASE
+                WHEN e.event_type='CREATED' THEN :t0 WHEN e.to_status='SUBMITTED' THEN :sub
+                WHEN e.to_status IN ('AI_ANALYSIS','PENDING_HUMAN_REVIEW') THEN :ran ELSE :rev END WHERE e.application_id=:id"""), p)
 
 
 def seed_assessments_from_db() -> None:
-    """Re-run the seeded assessments for already-seeded data (e.g. after a failed first run)."""
+    """Continue seeded assessments for already-seeded data (e.g. after an interrupted first run)."""
     from app.models import AgentRun
 
     with session_scope() as db:
@@ -301,7 +379,7 @@ def seed_assessments_from_db() -> None:
         by_email = {u.email: u for u in db.scalars(select(User).where(User.org_id == org.id))}
         users = {k: by_email[email_for(k)] for k in USERS if email_for(k) in by_email}
         created = {}
-        for c in COMPANIES:
+        for c in all_companies():
             a = db.scalar(select(FintechApplication).where(FintechApplication.org_id == org.id,
                                                            FintechApplication.company_name_en == c["company_name_en"]))
             if a:

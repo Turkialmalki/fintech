@@ -82,7 +82,8 @@ def ensure_bootstrapped() -> None:
             from app.seed.version import SEED_VERSION
 
             seeded = version is not None and conn.execute(text("SELECT EXISTS (SELECT 1 FROM regulatory_requirements)")).scalar()
-            drafts = seeded and conn.execute(text("SELECT EXISTS (SELECT 1 FROM assessment_drafts)")).scalar()
+            drafts = seeded and conn.execute(text(
+                "SELECT value->>'value' FROM system_settings WHERE key = 'seed.assessed' AND org_id IS NULL")).scalar() == SEED_VERSION
             current = seeded and conn.execute(text(
                 "SELECT value->>'value' FROM system_settings WHERE key = 'seed.version' AND org_id IS NULL")).scalar() == SEED_VERSION
             conn.commit()
@@ -112,7 +113,7 @@ def ensure_bootstrapped() -> None:
                     finally:
                         sys.argv = argv
                 elif not drafts:
-                    log.warning("bootstrap: re-running demo assessments")
+                    log.warning("bootstrap: continuing seeded assessments")
                     seed.seed_assessments_from_db()
                 _harden_supabase(conn)
                 _done = True
