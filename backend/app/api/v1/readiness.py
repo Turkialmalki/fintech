@@ -165,6 +165,22 @@ async def readiness_check(
 ):
     if not limiter.hit(f"readiness:{rc.ip or 'local'}", 12, 60):
         raise RateLimited()
+    files = [f for f in files if f.filename]
+    problems: dict[str, list[str]] = {}
+    if len(company_name.strip()) < 2:
+        problems["company_name"] = ["يرجى إدخال اسم الشركة", "Please enter the company name"]
+    if len(description.strip()) < 30:
+        problems["description"] = ["يرجى وصف نموذج العمل في 30 حرفاً على الأقل", "Please describe the business model in at least 30 characters"]
+    if paid_up_capital_sar is None or paid_up_capital_sar <= 0:
+        problems["capital"] = ["يرجى إدخال رأس المال المدفوع", "Please enter the paid-up capital"]
+    if not data_hosting_location.strip():
+        problems["hosting"] = ["يرجى تحديد موقع استضافة البيانات", "Please select the data hosting location"]
+    if not files:
+        problems["files"] = ["يرجى رفع وثيقة واحدة على الأقل", "Please upload at least one document"]
+    if problems:
+        first = next(iter(problems.values()))
+        raise AppError(first[1], first[0], details={"fields": {k: {"ar": v[0], "en": v[1]} for k, v in problems.items()}},
+                       status_code=422, code="VALIDATION_ERROR")
     if len(files) > MAX_FILES:
         raise AppError(f"At most {MAX_FILES} files", f"الحد الأقصى {MAX_FILES} ملفات", status_code=400, code="TOO_MANY_FILES")
     overrides = [s.strip() for s in document_types.split(",")] if document_types else []

@@ -24,12 +24,21 @@ FIN = """القوائم المالية المدققة للسنة المنتهي�
 
 
 def _check(client, files=(), **form):
-    data = {"service_category": "BNPL", "company_name": "شركة دانة للدفع الآجل", **form}
+    data = {"service_category": "BNPL", "company_name": "شركة دانة للدفع الآجل", "data_hosting_location": "الرياض",
+            "description": "منصة للشراء الآن والدفع لاحقاً تقسم المشتريات على أربع دفعات دون رسوم.", **form}
     return client.post("/api/v1/readiness/check", data=data, files=[("files", f) for f in files])
 
 
-def test_readiness_without_documents_reports_gaps(client):
-    r = _check(client, paid_up_capital_sar="3000000")
+def test_form_validation(client):
+    r = _check(client, company_name="", description="قصير", data_hosting_location="")
+    assert r.status_code == 422
+    fields = r.json()["error"]["details"]["fields"]
+    assert set(fields) == {"company_name", "description", "capital", "hosting", "files"}
+    assert fields["files"]["ar"] == "يرجى رفع وثيقة واحدة على الأقل"
+
+
+def test_readiness_reports_gaps(client):
+    r = _check(client, [("aml.txt", AML, "text/plain")], paid_up_capital_sar="3000000")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["stored"] is False and body["level"] == "LOW"
@@ -41,7 +50,7 @@ def test_readiness_without_documents_reports_gaps(client):
 
 
 def test_real_documents_are_accepted_and_improve_score(client):
-    base = _check(client, paid_up_capital_sar="6000000").json()["score"]
+    base = _check(client, [("aml.txt", AML, "text/plain")], paid_up_capital_sar="6000000").json()["score"]
     files = [("aml.txt", AML, "text/plain"), ("plan.txt", PLAN, "text/plain"), ("fin.txt", FIN, "text/plain")]
     r = _check(client, files, paid_up_capital_sar="6000000", data_hosting_location="الرياض").json()
     status = {a["filename"]: a for a in r["documents"]["analysed"]}
@@ -87,7 +96,8 @@ def test_consistency_checks(client):
 
 
 def test_offshore_hosting_risk(client):
-    r = _check(client, service_category="DIGITAL_WALLET", paid_up_capital_sar="1500000", data_hosting_location="Abroad").json()
+    r = _check(client, [("aml.txt", AML, "text/plain")], service_category="DIGITAL_WALLET", paid_up_capital_sar="1500000",
+               data_hosting_location="Abroad").json()
     assert any(x["code"] == "RISK-HOST-01" for x in r["risks"])
     assert next(i for i in r["requirements"] if i["code"] == "EMI-CAP")["outcome"] == "POTENTIAL_GAP"
 
@@ -100,5 +110,6 @@ def test_docx_upload_is_read(client):
         d.add_paragraph(line)
     buf = io.BytesIO()
     d.save(buf)
-    r = _check(client, [("aml.docx", buf.getvalue(), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")]).json()
+    r = _check(client, [("aml.docx", buf.getvalue(), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")],
+               paid_up_capital_sar="6000000").json()
     assert r["documents"]["analysed"][0]["status"] == "ACCEPTED"

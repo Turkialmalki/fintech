@@ -11,7 +11,7 @@ import { LogoMark } from "@/components/shell/logo";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui/field";
 import { Notice } from "@/components/ui/feedback";
-import { api, errorText } from "@/lib/api";
+import { api, ApiError, errorText } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -148,24 +148,56 @@ export default function ReadinessPage() {
   const top = useRef<HTMLDivElement>(null);
 
   const [fileErr, setFileErr] = useState<string[]>([]);
+  const [errs, setErrs] = useState<Record<string, string>>({});
+  const setField = (k: keyof typeof f, v: string | boolean, errKey?: string) => {
+    setF((cur) => ({ ...cur, [k]: v }));
+    if (errKey && errs[errKey]) setErrs((e) => { const n = { ...e }; delete n[errKey]; return n; });
+  };
+  const validate = () => {
+    const e: Record<string, string> = {};
+    const cap = Number(f.capital.replace(/[,\s]/g, ""));
+    const vol = f.volume.trim() ? Number(f.volume.replace(/[,\s]/g, "")) : 0;
+    if (f.company_name.trim().length < 2) e.company_name = pick("يرجى إدخال اسم الشركة", "Please enter the company name");
+    if (!f.description.trim()) e.description = pick("يرجى وصف نموذج العمل", "Please describe your business model");
+    else if (f.description.trim().length < 30) e.description = pick("الوصف قصير جداً — اكتب 30 حرفاً على الأقل", "Too short — write at least 30 characters");
+    if (!f.capital.trim()) e.capital = pick("يرجى إدخال رأس المال المدفوع", "Please enter the paid-up capital");
+    else if (!Number.isFinite(cap) || cap <= 0) e.capital = pick("أدخل رقماً صحيحاً أكبر من صفر", "Enter a valid number above zero");
+    if (!Number.isFinite(vol) || vol < 0) e.volume = pick("أدخل رقماً صحيحاً", "Enter a valid number");
+    if (!f.hosting) e.hosting = pick("يرجى تحديد موقع استضافة البيانات", "Please select the data hosting location");
+    if (files.length === 0) e.files = pick("يرجى رفع وثيقة واحدة على الأقل", "Please upload at least one document");
+    return e;
+  };
+  const focusFirst = (e: Record<string, string>) => {
+    const order = ["company_name", "capital", "description", "volume", "hosting", "files"];
+    const k = order.find((x) => e[x]);
+    const id = { company_name: "cn", capital: "cap", description: "desc", volume: "vol", hosting: "host", files: "dropzone" }[k ?? ""];
+    const el = id ? document.getElementById(id) : null;
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (el && "focus" in el) (el as HTMLElement).focus({ preventScroll: true });
+  };
   const addFiles = (list: FileList | null) => {
     if (!list) return;
-    const errs: string[] = [];
+    const fe: string[] = [];
     const ok: File[] = [];
     for (const x of Array.from(list)) {
-      if (!/\.(pdf|docx|txt)$/i.test(x.name)) errs.push(pick(`${x.name}: نوع غير مدعوم — PDF أو DOCX أو TXT فقط`, `${x.name}: unsupported type — PDF, DOCX or TXT only`));
-      else if (x.size === 0) errs.push(pick(`${x.name}: الملف فارغ`, `${x.name}: the file is empty`));
-      else if (x.size > 8 * 1024 * 1024) errs.push(pick(`${x.name}: يتجاوز 8 ميجابايت`, `${x.name}: larger than 8 MB`));
-      else if (files.some((f) => f.file.name === x.name && f.file.size === x.size)) errs.push(pick(`${x.name}: مضاف مسبقاً`, `${x.name}: already added`));
+      if (!/\.(pdf|docx|txt)$/i.test(x.name)) fe.push(pick(`${x.name}: نوع غير مدعوم — PDF أو DOCX أو TXT فقط`, `${x.name}: unsupported type — PDF, DOCX or TXT only`));
+      else if (x.size === 0) fe.push(pick(`${x.name}: الملف فارغ`, `${x.name}: the file is empty`));
+      else if (x.size > 8 * 1024 * 1024) fe.push(pick(`${x.name}: يتجاوز 8 ميجابايت`, `${x.name}: larger than 8 MB`));
+      else if (files.some((f) => f.file.name === x.name && f.file.size === x.size)) fe.push(pick(`${x.name}: مضاف مسبقاً`, `${x.name}: already added`));
       else ok.push(x);
     }
-    if (files.length + ok.length > 10) errs.push(pick("الحد الأقصى 10 ملفات", "At most 10 files"));
-    setFileErr(errs);
+    if (files.length + ok.length > 10) fe.push(pick("الحد الأقصى 10 ملفات", "At most 10 files"));
+    setFileErr(fe);
     setFiles((cur) => [...cur, ...ok.map((file) => ({ file, type: "AUTO" }))].slice(0, 10));
+    if (ok.length && errs.files) setErrs((e) => { const n = { ...e }; delete n.files; return n; });
   };
 
   const submit = async () => {
-    setErr(null); setBusy(true);
+    setErr(null);
+    const e = validate();
+    setErrs(e);
+    if (Object.keys(e).length) { setErr(pick("يرجى استكمال الحقول المطلوبة قبل بدء الفحص.", "Please complete the required fields before starting.")); focusFirst(e); return; }
+    setBusy(true);
     const fd = new FormData();
     fd.set("service_category", cat);
     fd.set("company_name", f.company_name);
@@ -181,6 +213,11 @@ export default function ReadinessPage() {
       setRes(r);
       setTimeout(() => top.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     } catch (e) {
+      const fields = e instanceof ApiError ? (e.details?.fields as Record<string, { ar: string; en: string }> | undefined) : undefined;
+      if (fields) {
+        const m = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, pick(v.ar, v.en)]));
+        setErrs(m); focusFirst(m);
+      }
       setErr(errorText(e, locale));
     } finally { setBusy(false); }
   };
@@ -243,37 +280,38 @@ export default function ReadinessPage() {
               <li>
                 <h2 className="flex items-center gap-2 text-[17px] font-semibold"><span className="grid size-6 place-items-center rounded-full bg-primary text-[12px] text-white">2</span>{pick("عن شركتك", "About your company")}</h2>
                 <div className="mt-4 grid gap-4 rounded-xl border border-line bg-surface p-5 sm:grid-cols-2">
-                  <Field label={pick("اسم الشركة", "Company name")} htmlFor="cn"><Input id="cn" value={f.company_name} onChange={(e) => setF({ ...f, company_name: e.target.value })} /></Field>
-                  <Field label={pick("رأس المال المدفوع (ريال)", "Paid-up capital (SAR)")} htmlFor="cap" hint={pick("إن تركته فارغاً نحاول استخراجه من وثائقك", "Leave empty to read it from your documents")}>
-                    <Input id="cap" inputMode="numeric" dir="ltr" placeholder="5,000,000" value={f.capital} onChange={(e) => setF({ ...f, capital: e.target.value })} />
+                  <Field label={pick("اسم الشركة", "Company name")} htmlFor="cn" required error={errs.company_name}><Input id="cn" aria-invalid={!!errs.company_name} value={f.company_name} onChange={(e) => setField("company_name", e.target.value, "company_name")} /></Field>
+                  <Field label={pick("رأس المال المدفوع (ريال)", "Paid-up capital (SAR)")} htmlFor="cap" required error={errs.capital}>
+                    <Input id="cap" inputMode="numeric" dir="ltr" placeholder="5,000,000" aria-invalid={!!errs.capital} value={f.capital} onChange={(e) => setField("capital", e.target.value, "capital")} />
                   </Field>
-                  <Field label={pick("وصف نموذج العمل", "Business model")} htmlFor="desc" className="sm:col-span-2" hint={pick("مثل: الخدمة، العملاء المستهدفون، الشركاء، وهل لديكم مسؤول التزام", "e.g. the service, target customers, partners, whether you have a compliance officer")}>
-                    <Textarea id="desc" rows={4} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
+                  <Field label={pick("وصف نموذج العمل", "Business model")} htmlFor="desc" className="sm:col-span-2" required error={errs.description} hint={errs.description ? undefined : pick("مثل: الخدمة، العملاء المستهدفون، الشركاء، وهل لديكم مسؤول التزام", "e.g. the service, target customers, partners, whether you have a compliance officer")}>
+                    <Textarea id="desc" rows={4} aria-invalid={!!errs.description} value={f.description} onChange={(e) => setField("description", e.target.value, "description")} />
                   </Field>
-                  <Field label={pick("حجم العمليات الشهري المتوقع (ريال)", "Expected monthly volume (SAR)")} htmlFor="vol">
-                    <Input id="vol" inputMode="numeric" dir="ltr" value={f.volume} onChange={(e) => setF({ ...f, volume: e.target.value })} />
+                  <Field label={pick("حجم العمليات الشهري المتوقع (ريال)", "Expected monthly volume (SAR)")} htmlFor="vol" error={errs.volume}>
+                    <Input id="vol" inputMode="numeric" dir="ltr" aria-invalid={!!errs.volume} value={f.volume} onChange={(e) => setField("volume", e.target.value, "volume")} />
                   </Field>
-                  <Field label={pick("موقع استضافة البيانات", "Data hosting location")} htmlFor="host">
-                    <Select id="host" value={f.hosting} onChange={(e) => setF({ ...f, hosting: e.target.value })}>
-                      <option value="">{pick("غير محدد", "Not specified")}</option>
+                  <Field label={pick("موقع استضافة البيانات", "Data hosting location")} htmlFor="host" required error={errs.hosting}>
+                    <Select id="host" aria-invalid={!!errs.hosting} value={f.hosting} onChange={(e) => setField("hosting", e.target.value, "hosting")}>
+                      <option value="">{pick("اختر…", "Select…")}</option>
                       <option value="السعودية">{pick("داخل المملكة", "Inside Saudi Arabia")}</option>
                       <option value="Abroad">{pick("خارج المملكة", "Outside Saudi Arabia")}</option>
                     </Select>
                   </Field>
-                  <div className="sm:col-span-2"><Checkbox label={pick("نعتمد على مزودي خدمات خارجيين في وظائف جوهرية (سحابة، معالجة، تحقق هوية…)", "We rely on third parties for core functions (cloud, processing, identity…)")} checked={f.third} onChange={(v) => setF({ ...f, third: v })} /></div>
+                  <div className="sm:col-span-2"><Checkbox label={pick("نعتمد على مزودي خدمات خارجيين في وظائف جوهرية (سحابة، معالجة، تحقق هوية…)", "We rely on third parties for core functions (cloud, processing, identity…)")} checked={f.third} onChange={(v) => setField("third", v)} /></div>
                 </div>
               </li>
 
               <li>
-                <h2 className="flex items-center gap-2 text-[17px] font-semibold"><span className="grid size-6 place-items-center rounded-full bg-primary text-[12px] text-white">3</span>{pick("وثائقك", "Your documents")}<span className="text-[13px] font-normal text-muted">({t.common.optional})</span></h2>
-                <div onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
+                <h2 className="flex items-center gap-2 text-[17px] font-semibold"><span className="grid size-6 place-items-center rounded-full bg-primary text-[12px] text-white">3</span>{pick("وثائقك", "Your documents")}<span className="text-[13px] font-normal text-danger">*</span></h2>
+                <div id="dropzone" tabIndex={-1} onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
                   onDrop={(e) => { e.preventDefault(); setDrag(false); addFiles(e.dataTransfer.files); }}
-                  className={cn("mt-4 grid place-items-center rounded-xl border-2 border-dashed bg-surface px-6 py-9 text-center transition-colors", drag ? "border-primary bg-primary-soft/40" : "border-line-strong")}>
+                  className={cn("mt-4 grid place-items-center rounded-xl border-2 border-dashed bg-surface px-6 py-9 text-center transition-colors", drag ? "border-primary bg-primary-soft/40" : errs.files ? "border-danger-base bg-danger-soft/30" : "border-line-strong")}>
                   <span className="grid size-11 place-items-center rounded-full bg-primary-soft text-primary"><Upload className="size-5" /></span>
                   <p className="mt-3 text-[14.5px] font-medium">{pick("اسحب الملفات هنا أو", "Drag files here or")} <button type="button" onClick={() => input.current?.click()} className="text-primary hover:underline">{pick("اختر من جهازك", "browse")}</button></p>
                   <p className="mt-1 text-[12.5px] text-muted">{pick("PDF أو DOCX أو TXT · حتى 10 ملفات · 8 ميجابايت للملف. نتحقق من أن كل ملف وثيقة حقيقية مقروءة ونطابق محتواها مع العناصر الأساسية المطلوبة لنوعها.", "PDF, DOCX or TXT · up to 10 files · 8 MB each. We verify each file is a real, readable document and check its content against the core elements its type requires.")}</p>
                   <input ref={input} type="file" multiple accept=".pdf,.docx,.txt" className="hidden" onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
                 </div>
+                {errs.files && <p role="alert" className="mt-2 flex items-center gap-1.5 text-[13px] font-medium text-danger"><TriangleAlert className="size-4" />{errs.files}</p>}
                 {fileErr.length > 0 && <div className="mt-3"><Notice tone="danger"><ul className="flex flex-col gap-0.5">{fileErr.map((e) => <li key={e}>{e}</li>)}</ul></Notice></div>}
                 {files.length > 0 && (
                   <ul className="mt-3 flex flex-col gap-2">
@@ -326,6 +364,9 @@ export default function ReadinessPage() {
 
             <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
               <div className="flex flex-col gap-8">
+                {res.documents.analysed.length > 0 && !res.documents.analysed.some((d) => d.status === "ACCEPTED") && (
+                  <Notice tone="danger">{pick("لم تُقبل أي من الوثائق المرفوعة، لذلك تعكس النتيجة البيانات المدخلة فقط. راجع أسباب الرفض أدناه وأعد الرفع.", "None of the uploaded documents were accepted, so the result reflects only the details you entered. See the reasons below and re-upload.")}</Notice>
+                )}
                 {res.documents.analysed.length > 0 && <DocChecks docs={res.documents.analysed} />}
                 {res.consistency.length > 0 && (
                   <section>
