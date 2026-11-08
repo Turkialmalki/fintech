@@ -107,6 +107,17 @@ def _from_platform_env(s: Settings) -> Settings:
         q.setdefault("sslmode", "require")
         q["options"] = "-csearch_path=rip,extensions"
         s.database_url = urlunsplit(("postgresql+psycopg", netloc, u.path or "/postgres", urlencode(q), ""))
+    if os.getenv("VERCEL"):
+        # Serverless-safe defaults on Vercel unless explicitly overridden by environment variables.
+        defaults = {"AUTO_BOOTSTRAP": ("auto_bootstrap", True), "STORAGE_BACKEND": (None, "db"),
+                    "AGENT_RUN_MODE": ("agent_run_mode", "sync"), "REDIS_URL": ("redis_url", "")}
+        for env, (attr, value) in defaults.items():
+            if os.getenv(env) is None:
+                if attr:
+                    setattr(s, attr, value)
+                else:
+                    os.environ[env] = value
+        s.serverless = True
     default_secret = "change-me-local-only-secret-change-me"
     if s.jwt_secret.get_secret_value() == default_secret and os.getenv("SUPABASE_JWT_SECRET"):
         derived = hmac.new(os.environ["SUPABASE_JWT_SECRET"].encode(), b"rip-api-jwt-v1", hashlib.sha256).hexdigest()

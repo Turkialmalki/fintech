@@ -35,6 +35,21 @@ open http://localhost:3000      # Arabic UI
 Demo accounts (password `Demo@2026!`): `analyst@rip.demo`, `supervisor@rip.demo`, `admin@rip.demo`, `auditor@rip.demo`,
 `viewer@rip.demo`, and `admin@tenantb.demo` (a second tenant, to see isolation).
 
+## Deploy on Vercel
+
+The repo root contains a `vercel.json` using **Vercel Services**: `frontend/` (Next.js) and `backend/` (FastAPI) run in one
+project, with `/api/*` routed to the backend. On Vercel the backend automatically uses serverless-safe defaults:
+database-backed file storage, synchronous agent runs, no Redis, and **first-request bootstrap** (migrations + synthetic seed).
+
+1. Vercel → **Add New → Project** → import this GitHub repository (framework is detected from `vercel.json`).
+2. Vercel → project → **Integrations → Supabase** → connect a Supabase project (pgvector is used automatically).
+   The integration injects `POSTGRES_URL` and `SUPABASE_JWT_SECRET`; the backend switches to the session pooler and a
+   private `rip` schema (not exposed by Supabase's REST API) and derives its own JWT key — no secrets copied by hand.
+   Alternatively set `DATABASE_URL` and `JWT_SECRET` yourself.
+3. Deploy. The first API request takes ~10–30 s while the database is migrated and seeded; then sign in with the demo accounts.
+
+Model providers are configured with the same environment variables as elsewhere (`AI_PROVIDER`, `QWEN_BASE_URL`, …).
+
 ## Local development (without Docker)
 
 ```bash
