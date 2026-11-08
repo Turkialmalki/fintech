@@ -52,6 +52,7 @@ USERS = {
     "analyst2": ("lama.alshehri", "لمى الشهري", "Lama Alshehri", "محللة امتثال", "Compliance analyst", ["analyst"]),
     "auditor": ("majed.alzahrani", "ماجد الزهراني", "Majed Alzahrani", "مدقق داخلي", "Internal auditor", ["auditor"]),
     "viewer": ("hessa.alghamdi", "حصة الغامدي", "Hessa Alghamdi", "إدارة المخاطر — اطلاع", "Risk management (read-only)", ["viewer"]),
+    "guest": ("reviewer", "حساب التجربة", "Guest Reviewer", "محلل امتثال (تجربة)", "Compliance analyst (trial)", ["analyst"]),
 }
 
 
