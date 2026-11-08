@@ -136,7 +136,8 @@ class AgentToolClient:
             try:
                 payload = json.loads(res.content[0].text)
             except Exception:
-                payload = {"ok": False, "error": {"code": "BAD_TOOL_RESPONSE", "message": "unparseable tool response"}}
+                detail = " ".join(getattr(c, "text", "") for c in (res.content or []))[:500]
+                payload = {"ok": False, "error": {"code": "BAD_TOOL_RESPONSE", "message": f"unparseable tool response: {detail}"}}
         if getattr(res, "is_error", False) or not payload.get("ok", False):
             err = payload.get("error") or {"code": "TOOL_ERROR", "message": str(payload)[:300]}
             self.recorder.record(agent, "TOOL_CALL", tool, status="ERROR", duration_ms=dur, input=args, output=payload,

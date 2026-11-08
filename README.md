@@ -43,10 +43,11 @@ database-backed file storage, synchronous agent runs, no Redis, and **first-requ
 
 1. Vercel → **Add New → Project** → import this GitHub repository (framework is detected from `vercel.json`).
 2. Vercel → project → **Integrations → Supabase** → connect a Supabase project (pgvector is used automatically).
-   The integration injects `POSTGRES_URL` and `SUPABASE_JWT_SECRET`; the backend switches to the session pooler and a
-   private `rip` schema (not exposed by Supabase's REST API) and derives its own JWT key — no secrets copied by hand.
+   The integration injects `POSTGRES_URL` and `SUPABASE_JWT_SECRET`; the backend switches to the session pooler,
+   derives its own JWT key, and on first start enables RLS and revokes Supabase's `anon`/`authenticated` roles on
+   every application table so the auto-generated REST API cannot read them — no secrets copied by hand.
    Alternatively set `DATABASE_URL` and `JWT_SECRET` yourself.
-3. Deploy. The first API request takes ~10–30 s while the database is migrated and seeded; then sign in with the demo accounts.
+3. Functions run in `bom1` (Mumbai, `vercel.json` → `regions`); put the database in the same region. Deploy. The first API request takes ~10–30 s while the database is migrated and seeded; then sign in with the demo accounts.
 
 Model providers are configured with the same environment variables as elsewhere (`AI_PROVIDER`, `QWEN_BASE_URL`, …).
 

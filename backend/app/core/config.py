@@ -89,8 +89,9 @@ class Settings(BaseSettings):
 def _from_platform_env(s: Settings) -> Settings:
     """Adopt credentials injected by platform integrations, so secrets never have to be copied by hand.
 
-    - Supabase ↔ Vercel integration injects POSTGRES_URL (pooler). We switch it to session mode (port 5432),
-      the psycopg driver, and the dedicated `rip` schema (not exposed by Supabase's REST API).
+    - Supabase ↔ Vercel integration injects POSTGRES_URL (pooler). We switch it to session mode (port 5432) and the
+      psycopg driver. The pooler ignores startup options, so tables live in `public`; bootstrap enables RLS and
+      revokes the API roles on them (see core/bootstrap.py), so Supabase's REST API cannot read them.
     - If JWT_SECRET is not set, derive an application-specific key from SUPABASE_JWT_SECRET (HMAC, never reused directly).
     """
     import hashlib
@@ -105,7 +106,6 @@ def _from_platform_env(s: Settings) -> Settings:
         netloc = u.netloc.rsplit("@", 1)[0] + f"@{host}:{port}"
         q = {k: v for k, v in parse_qsl(u.query) if k in ("sslmode",)}
         q.setdefault("sslmode", "require")
-        q["options"] = "-csearch_path=rip,extensions"
         s.database_url = urlunsplit(("postgresql+psycopg", netloc, u.path or "/postgres", urlencode(q), ""))
     if os.getenv("VERCEL"):
         # Serverless-safe defaults on Vercel unless explicitly overridden by environment variables.

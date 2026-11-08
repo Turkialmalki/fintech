@@ -15,10 +15,10 @@ class Base(DeclarativeBase):
 
 def _engine_kwargs() -> dict:
     if settings.serverless:
-        # Serverless + transaction pooler (PgBouncer/Supavisor): no local pool, no server-side prepared statements.
-        from sqlalchemy.pool import NullPool
-
-        return {"poolclass": NullPool, "connect_args": {"prepare_threshold": None, "connect_timeout": 10}}
+        # Serverless instances are reused between requests (Fluid compute): keep a *small* pool of session-pooler
+        # connections, verified before use and recycled often. No server-side prepared statements (pooler-safe).
+        return {"pool_size": 2, "max_overflow": 3, "pool_pre_ping": True, "pool_recycle": 120, "pool_timeout": 15,
+                "connect_args": {"prepare_threshold": None, "connect_timeout": 10}}
     return {"pool_pre_ping": True, "pool_size": 10, "max_overflow": 20}
 
 

@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import date
 
 import numpy as np
-from sqlalchemy import and_, cast, func, literal, select, text
+from sqlalchemy import Float, and_, cast, func, literal, select, text
 from sqlalchemy.orm import Session
 
 from app.ai.service import get_ai
@@ -112,7 +112,7 @@ def keyword_search(db: Session, principal: Principal, query: str, f: SearchFilte
 def vector_search(db: Session, principal: Principal, qvec: list[float], f: SearchFilters, limit: int = 30) -> list[tuple[uuid.UUID, float]]:
     conds = _base_conditions(principal, f)
     if pgvector_available():
-        dist = Embedding.vector.op("<=>")(cast(literal(json.dumps(qvec)), PgVector()))  # cosine distance
+        dist = Embedding.vector.op("<=>", return_type=Float())(cast(literal(json.dumps(qvec)), PgVector()))  # cosine distance
         stmt = _joined(select(RegulatoryChunk.id, (1 - dist).label("sim"))).join(
             Embedding, Embedding.chunk_id == RegulatoryChunk.id).where(and_(*conds)).order_by(dist).limit(limit)
         return [(r[0], float(r[1])) for r in db.execute(stmt)]

@@ -273,6 +273,23 @@ def seed_assessments(ctx, created) -> None:
         asmt.decide(db, analyst, d, "REQUEST_INFORMATION", "يرجى تقديم سياسة حماية العملاء وإطار إدارة المخاطر وهيكل الحوكمة.", True)
 
 
+def seed_assessments_from_db() -> None:
+    """Re-run the demo assessments for already-seeded data (e.g. after a failed first run)."""
+    from app.models import AgentRun
+
+    with session_scope() as db:
+        org = db.scalar(select(Organization).where(Organization.slug == "demo-supervision"))
+        users = {u.email: u for u in db.scalars(select(User).where(User.org_id == org.id))}
+        created = {}
+        for c in COMPANIES:
+            a = db.scalar(select(FintechApplication).where(FintechApplication.org_id == org.id,
+                                                           FintechApplication.company_name_en == c["company_name_en"]))
+            if a:
+                created[c["key"]] = a
+        db.query(AgentRun).filter(AgentRun.org_id == org.id, AgentRun.status == "FAILED").delete()
+    seed_assessments({"users": users}, created)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--reset", action="store_true")
