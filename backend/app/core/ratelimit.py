@@ -14,7 +14,7 @@ log = logging.getLogger("rip.ratelimit")
 
 class RateLimiter:
     def __init__(self, url: str):
-        self._redis = redis.Redis.from_url(url, socket_connect_timeout=0.5, socket_timeout=0.5) if url else None
+        self._redis = redis.Redis.from_url(url, socket_connect_timeout=0.5, socket_timeout=0.5) if url and url.lower() != "none" else None
         self._local: dict[str, tuple[int, int]] = {}
         self._lock = threading.Lock()
         self._redis_ok: bool | None = None
