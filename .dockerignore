@@ -1,0 +1,8 @@
+**/.venv
+**/node_modules
+**/.next
+**/__pycache__
+**/.test-storage
+storage
+docs/screenshots
+.git

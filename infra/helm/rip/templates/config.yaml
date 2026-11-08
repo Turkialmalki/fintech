@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: {{ .Release.Name }}-config, labels: {{- include "rip.labels" . | nindent 4 }} }
+data:
+  MCP_URL: http://{{ .Release.Name }}-mcp:8765/mcp
+  CORS_ORIGINS: https://{{ .Values.host }}
+{{- range $k, $v := .Values.config }}
+  {{ $k }}: {{ $v | quote }}
+{{- end }}

@@ -1,0 +1,23 @@
+image:
+  registry: ghcr.io/your-org
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+host: rip.example.com
+existingSecret: rip-secrets          # DATABASE_URL, REDIS_URL, JWT_SECRET, S3_BUCKET, QWEN_API_KEY, ...
+config:
+  ENVIRONMENT: production
+  VECTOR_BACKEND: pgvector
+  AI_PROVIDER: qwen
+  AI_MODEL: Qwen/Qwen2.5-72B-Instruct
+  QWEN_BASE_URL: http://vllm-qwen.inference:8000/v1
+  LLAMA_BASE_URL: http://vllm-llama.inference:8000/v1
+  EMBEDDING_PROVIDER: openai_compatible
+  EMBEDDING_MODEL: BAAI/bge-m3
+  EMBEDDING_BASE_URL: http://tei-bge-m3.inference:80/v1
+  EMBEDDING_DIM: "1024"
+  STORAGE_BACKEND: s3
+  FILE_SCANNER: clamav
+components:
+  api: { port: 8000, replicas: 2, health: /healthz, ready: /readyz, cpu: 250m, memory: 512Mi, maxReplicas: 10 }
+  mcp: { port: 8765, replicas: 2, health: /healthz, ready: /healthz, cpu: 100m, memory: 256Mi, maxReplicas: 4 }
+  web: { port: 3000, replicas: 2, health: /login, ready: /login, cpu: 100m, memory: 256Mi, maxReplicas: 6 }

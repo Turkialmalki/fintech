@@ -1,0 +1,21 @@
+name: Deploy
+on:
+  workflow_dispatch:
+    inputs:
+      environment: { type: choice, options: [staging, production], required: true }
+      image_tag: { description: "Image tag (git SHA)", required: true }
+permissions: { contents: read, id-token: write }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}   # production requires manual approval in repo settings
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with: { role-to-assume: "${{ secrets.DEPLOY_ROLE_ARN }}", aws-region: me-central-1 }
+      - run: aws eks update-kubeconfig --name rip-${{ inputs.environment }}
+      - uses: azure/setup-helm@v4
+      - run: |
+          helm upgrade --install rip infra/helm/rip --namespace rip --create-namespace \
+            --set image.tag=${{ inputs.image_tag }} --set host=${{ vars.RIP_HOST }} --wait --timeout 10m
+      - run: kubectl -n rip rollout status deploy/rip-api --timeout=5m

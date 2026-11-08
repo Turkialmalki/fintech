@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: rip-web }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: rip-web } }
+  template:
+    metadata: { labels: { app: rip-web } }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: web
+          image: ghcr.io/your-org/rip-web:latest
+          ports: [{ containerPort: 3000, name: http }]
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
+          readinessProbe: { httpGet: { path: /login, port: http } }
+          livenessProbe: { httpGet: { path: /login, port: http }, periodSeconds: 20 }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts: [{ name: cache, mountPath: /app/.next/cache }]
+      volumes: [{ name: cache, emptyDir: {} }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: rip-web }
+spec: { selector: { app: rip-web }, ports: [{ port: 3000, targetPort: http, name: http }] }

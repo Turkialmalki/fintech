@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+/* ---- Fonts (SIL OFL 1.1, self-hosted) ---------------------------------------------- */
+@font-face { font-family: "Plex Arabic"; src: url("/fonts/IBMPlexSansArabic-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Plex Arabic"; src: url("/fonts/IBMPlexSansArabic-Medium.ttf") format("truetype"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Plex Arabic"; src: url("/fonts/IBMPlexSansArabic-SemiBold.ttf") format("truetype"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Plex Arabic"; src: url("/fonts/IBMPlexSansArabic-Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("/fonts/Inter.ttf") format("truetype"); font-weight: 100 900; font-display: swap; }
+
+/* ---- Design tokens ---------------------------------------------------------------------- */
+@theme {
+  --color-canvas: #F7F9FC;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #F1F4F8;
+  --color-surface-3: #E9EEF5;
+  --color-ink: #142238;
+  --color-ink-2: #3A4A60;
+  --color-muted: #68778B;
+  --color-faint: #98A4B5;
+  --color-line: #E5EAF0;
+  --color-line-strong: #D3DBE6;
+  --color-primary: #2457D6;
+  --color-primary-hover: #1946B8;
+  --color-primary-soft: #EAF0FC;
+  --color-success: #15966A;
+  --color-success-soft: #E6F5EF;
+  --color-warning: #B9760F;
+  --color-warning-base: #D99024;
+  --color-warning-soft: #FBF3E4;
+  --color-danger: #C8414A;
+  --color-danger-base: #D94B52;
+  --color-danger-soft: #FCECEC;
+  --color-accent: #6479E8;
+  --color-accent-soft: #EEF0FD;
+
+  --font-sans: "Plex Arabic", "Inter", system-ui, sans-serif;
+  --font-latin: "Inter", "Plex Arabic", system-ui, sans-serif;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --shadow-pop: 0 12px 32px -12px rgb(20 34 56 / 0.18), 0 2px 6px -2px rgb(20 34 56 / 0.08);
+  --shadow-hair: 0 1px 0 rgb(20 34 56 / 0.04);
+
+  --text-2xs: 0.6875rem;
+}
+
+/* ---- Base --------------------------------------------------------------------------------- */
+@layer base {
+  html { background: var(--color-canvas); color: var(--color-ink); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  html[lang="en"] body { font-family: var(--font-latin); }
+  body { font-family: var(--font-sans); font-feature-settings: "tnum" 1, "lnum" 1; font-size: 14px; line-height: 1.6; }
+  html[lang="ar"] body { font-size: 14.5px; line-height: 1.75; }
+  ::selection { background: #2457D633; }
+  :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 4px; }
+  button, [role="button"] { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  /* technical identifiers keep LTR inside RTL text */
+  .ltr { direction: ltr; unicode-bidi: isolate; font-family: var(--font-latin); }
+  .num { font-variant-numeric: tabular-nums; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+@layer components {
+  .skeleton { background: linear-gradient(90deg, var(--color-surface-2), var(--color-surface-3), var(--color-surface-2)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: var(--radius-sm); }
+  .scroll-thin { scrollbar-width: thin; scrollbar-color: var(--color-line-strong) transparent; }
+  .prose-rip p + p { margin-top: 0.6rem; }
+}
+
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.animate-rise { animation: rise 0.42s cubic-bezier(.2,.7,.2,1) both; }

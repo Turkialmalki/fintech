@@ -1,0 +1,23 @@
+# Pinned runtime dependencies (Python 3.12+)
+fastapi==0.121.3
+uvicorn[standard]==0.54.0
+SQLAlchemy==2.0.57
+alembic==1.20.1
+psycopg[binary]==3.3.8
+pydantic==2.14.3
+pydantic-settings==2.16.2
+email-validator==2.3.0
+PyJWT==2.15.1
+bcrypt==5.0.0
+redis==8.1.0
+httpx==0.28.1
+langgraph==1.2.20
+langchain-core==1.7.6
+mcp==2.3.0
+numpy==2.5.4
+pypdf==7.0.0
+python-docx==1.2.0
+python-multipart==0.0.33
+reportlab==5.1.0
+arabic-reshaper==3.1.0
+python-bidi==0.6.12

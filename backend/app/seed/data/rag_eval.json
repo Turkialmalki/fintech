@@ -1,0 +1,20 @@
+{
+  "version": "1.0",
+  "description": "Synthetic evaluation set for the demo corpus (RIP-SYN-*). Each case names the document and section(s) that contain the answer.",
+  "cases": [
+    {"id": "ar-01", "language": "ar", "question": "ما الحد الأدنى لرأس المال المدفوع لمقدمي خدمات المحافظ الرقمية؟", "document_code": "RIP-SYN-001", "sections": ["المادة 2"], "expected_relevant": 1},
+    {"id": "ar-02", "language": "ar", "question": "ما متطلبات سياسة مكافحة غسل الأموال وتمويل الإرهاب؟", "document_code": "RIP-SYN-001", "sections": ["المادة 4"], "expected_relevant": 1},
+    {"id": "ar-03", "language": "ar", "question": "أين يجب استضافة بيانات العملاء؟", "document_code": "RIP-SYN-001", "sections": ["المادة 6"], "expected_relevant": 1},
+    {"id": "ar-04", "language": "ar", "question": "ما المدة القصوى لمعالجة شكاوى العملاء؟", "document_code": "RIP-SYN-001", "sections": ["المادة 8"], "expected_relevant": 1},
+    {"id": "ar-05", "language": "ar", "question": "ما مدة صلاحية موافقة العميل على الوصول إلى بيانات الحسابات في المصرفية المفتوحة؟", "document_code": "RIP-SYN-003", "sections": ["الفصل 2"], "expected_relevant": 1},
+    {"id": "ar-06", "language": "ar", "question": "كم مدة الاحتفاظ بسجلات طلبات الوصول إلى واجهات البرمجة؟", "document_code": "RIP-SYN-003", "sections": ["الفصل 3"], "expected_relevant": 1},
+    {"id": "ar-07", "language": "ar", "question": "ما المطلوب عند الإسناد إلى مزودي خدمات خارجيين؟", "document_code": "RIP-SYN-001", "sections": ["المادة 7"], "expected_relevant": 1},
+    {"id": "ar-08", "language": "ar", "question": "ما مكونات سياسة الأمن السيبراني المطلوبة؟", "document_code": "RIP-SYN-001", "sections": ["المادة 5"], "expected_relevant": 1},
+    {"id": "en-01", "language": "en", "question": "What must a BNPL provider consider in the affordability assessment?", "document_code": "RIP-SYN-002", "sections": ["Section 2"], "expected_relevant": 1},
+    {"id": "en-02", "language": "en", "question": "Can late payment charges compound for BNPL plans?", "document_code": "RIP-SYN-002", "sections": ["Section 3"], "expected_relevant": 1},
+    {"id": "en-03", "language": "en", "question": "What is the maximum aggregate outstanding balance per BNPL customer?", "document_code": "RIP-SYN-002", "sections": ["Section 4"], "expected_relevant": 1},
+    {"id": "en-04", "language": "en", "question": "How quickly must BNPL complaints be resolved?", "document_code": "RIP-SYN-002", "sections": ["Section 6"], "expected_relevant": 1},
+    {"id": "en-05", "language": "en", "question": "Which indicators warrant closer supervisory review of an applicant?", "document_code": "RIP-SYN-004", "sections": ["Section 3"], "expected_relevant": 1},
+    {"id": "en-06", "language": "en", "question": "Where should customer data be hosted and what is needed to host it abroad?", "document_code": "RIP-SYN-004", "sections": ["Section 1"], "expected_relevant": 1}
+  ]
+}

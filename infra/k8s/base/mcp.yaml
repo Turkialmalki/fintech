@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: rip-mcp }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: rip-mcp } }
+  template:
+    metadata: { labels: { app: rip-mcp } }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: mcp
+          image: ghcr.io/your-org/rip-mcp:latest
+          ports: [{ containerPort: 8765, name: mcp }]
+          envFrom: [{ configMapRef: { name: rip-config } }, { secretRef: { name: rip-secrets } }]
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
+          readinessProbe: { httpGet: { path: /healthz, port: mcp } }
+          livenessProbe: { httpGet: { path: /healthz, port: mcp }, periodSeconds: 20 }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+      volumes: [{ name: tmp, emptyDir: {} }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: rip-mcp }
+spec: { selector: { app: rip-mcp }, ports: [{ port: 8765, targetPort: mcp, name: mcp }] }

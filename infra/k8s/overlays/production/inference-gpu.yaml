@@ -1,0 +1,34 @@
+# Private model hosting (optional): Qwen served by vLLM on a dedicated GPU node pool, OpenAI-compatible API.
+# Swap the model/args for Llama: --model meta-llama/Llama-3.3-70B-Instruct --enable-auto-tool-choice --tool-call-parser llama3_json
+apiVersion: v1
+kind: Namespace
+metadata: { name: inference }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: vllm-qwen, namespace: inference }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: vllm-qwen } }
+  template:
+    metadata: { labels: { app: vllm-qwen } }
+    spec:
+      nodeSelector: { workload: gpu-inference }
+      tolerations: [{ key: nvidia.com/gpu, operator: Exists, effect: NoSchedule }]
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:latest
+          args: ["--model", "Qwen/Qwen2.5-72B-Instruct-AWQ", "--tensor-parallel-size", "2", "--max-model-len", "32768",
+                 "--gpu-memory-utilization", "0.92", "--enable-auto-tool-choice", "--tool-call-parser", "hermes"]
+          ports: [{ containerPort: 8000 }]
+          resources: { limits: { nvidia.com/gpu: 2 }, requests: { cpu: "8", memory: 64Gi } }
+          readinessProbe: { httpGet: { path: /health, port: 8000 }, initialDelaySeconds: 120, periodSeconds: 15 }
+          volumeMounts: [{ name: models, mountPath: /root/.cache/huggingface }, { name: shm, mountPath: /dev/shm }]
+      volumes:
+        - { name: models, persistentVolumeClaim: { claimName: model-cache } }
+        - { name: shm, emptyDir: { medium: Memory, sizeLimit: 16Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: vllm-qwen, namespace: inference }
+spec: { selector: { app: vllm-qwen }, ports: [{ port: 8000 }] }

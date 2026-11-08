@@ -1,0 +1,18 @@
+# Run before each rollout (Argo CD PreSync hook / helm pre-upgrade). Migrations are backward compatible (expand → migrate → contract).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rip-migrate
+  annotations: { argocd.argoproj.io/hook: PreSync, argocd.argoproj.io/hook-delete-policy: BeforeHookCreation }
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: migrate
+          image: ghcr.io/your-org/rip-api:latest
+          command: ["alembic", "upgrade", "head"]
+          envFrom: [{ configMapRef: { name: rip-config } }, { secretRef: { name: rip-secrets } }]
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }

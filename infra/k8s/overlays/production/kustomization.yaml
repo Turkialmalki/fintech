@@ -1,0 +1,7 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: [../../base, inference-gpu.yaml]
+images:
+  - { name: ghcr.io/your-org/rip-api, newTag: "1.0.0" }
+  - { name: ghcr.io/your-org/rip-mcp, newTag: "1.0.0" }
+  - { name: ghcr.io/your-org/rip-web, newTag: "1.0.0" }

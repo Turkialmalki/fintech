@@ -1,0 +1,26 @@
+SYNTHETIC DEMONSTRATION DOCUMENT — NOT AN OFFICIAL PUBLICATION
+This document was written for the RIP demonstration environment. It is not issued by the Saudi Central Bank (SAMA) or any authority and does not describe actual regulatory requirements.
+
+Synthetic Conduct Guidelines for Buy Now Pay Later (BNPL) Services
+Document code: RIP-SYN-002
+
+Section 1 - Purpose
+These synthetic guidelines illustrate how a reviewer might assess consumer-conduct controls of a BNPL provider in the demonstration platform.
+
+Section 2 - Affordability Assessment
+A BNPL provider must perform an affordability assessment before granting any instalment plan. The assessment must consider the customer's verified income, existing obligations and credit bureau data. Providers must not grant plans whose total outstanding amount exceeds the limit derived from the affordability assessment.
+
+Section 3 - Fees and Late Payment Charges
+All fees must be disclosed before the customer accepts the plan. Late payment charges must be fixed amounts disclosed in advance and must not compound. The provider must send a reminder at least three days before each instalment due date.
+
+Section 4 - Customer Limits
+The aggregate outstanding balance of a single customer across all plans must not exceed SAR 5,000 unless an enhanced affordability assessment is documented.
+
+Section 5 - Merchant Due Diligence
+The provider must perform due diligence on onboarded merchants, including verification of commercial registration and screening for prohibited activities.
+
+Section 6 - Complaints Handling
+The provider must maintain a complaints register and resolve complaints within ten business days, providing the customer with a reference number.
+
+Section 7 - Credit Reporting
+The provider must report repayment behaviour to a licensed credit bureau and inform customers that their data will be reported.

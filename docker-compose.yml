@@ -1,0 +1,67 @@
+# Local / demo deployment. `docker compose up --build` then open http://localhost:3000
+name: rip
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+psycopg://rip:${POSTGRES_PASSWORD:-rip}@postgres:5432/rip
+  REDIS_URL: redis://redis:6379/0
+  JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+  CORS_ORIGINS: http://localhost:3000
+  VECTOR_BACKEND: pgvector
+  AI_PROVIDER: ${AI_PROVIDER:-mock}
+  AI_MODEL: ${AI_MODEL:-}
+  AI_BASE_URL: ${AI_BASE_URL:-}
+  AI_API_KEY: ${AI_API_KEY:-}
+  QWEN_BASE_URL: ${QWEN_BASE_URL:-}
+  QWEN_API_KEY: ${QWEN_API_KEY:-}
+  LLAMA_BASE_URL: ${LLAMA_BASE_URL:-}
+  LLAMA_API_KEY: ${LLAMA_API_KEY:-}
+  EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-mock}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
+  EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
+  EMBEDDING_DIM: ${EMBEDDING_DIM:-384}
+  MCP_URL: http://mcp:8765/mcp
+  FILE_SCANNER: ${FILE_SCANNER:-none}
+  STORAGE_DIR: /data/storage
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment: { POSTGRES_USER: rip, POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-rip}", POSTGRES_DB: rip }
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U rip"], interval: 5s, retries: 20 }
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, retries: 20 }
+
+  migrate:
+    build: { context: ., dockerfile: backend/Dockerfile }
+    environment: *backend-env
+    command: ["sh", "-c", "alembic upgrade head && python -m app.seed.run"]
+    volumes: [storage:/data/storage]
+    depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_healthy } }
+
+  api:
+    build: { context: ., dockerfile: backend/Dockerfile }
+    environment: *backend-env
+    volumes: [storage:/data/storage]
+    ports: ["8000:8000"]
+    depends_on: { migrate: { condition: service_completed_successfully } }
+
+  mcp:
+    build: { context: ., dockerfile: mcp_server/Dockerfile }
+    environment: *backend-env
+    ports: ["8765:8765"]
+    depends_on: { migrate: { condition: service_completed_successfully } }
+
+  web:
+    build: { context: ., dockerfile: frontend/Dockerfile, args: { API_ORIGIN: "http://api:8000" } }
+    ports: ["3000:3000"]
+    depends_on: { api: { condition: service_healthy } }
+
+  # Optional: ClamAV for upload scanning (set FILE_SCANNER=clamav)
+  clamav:
+    image: clamav/clamav:stable
+    profiles: ["scan"]
+
+volumes: { pgdata: {}, storage: {} }

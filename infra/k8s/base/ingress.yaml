@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rip
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-body-size: 25m
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls: [{ hosts: [rip.example.com, mcp.rip.example.com], secretName: rip-tls }]
+  rules:
+    - host: rip.example.com
+      http: { paths: [{ path: /, pathType: Prefix, backend: { service: { name: rip-web, port: { number: 3000 } } } }] }
+    - host: mcp.rip.example.com   # optional: expose MCP to approved external clients only (add IP allow-list)
+      http: { paths: [{ path: /mcp, pathType: Prefix, backend: { service: { name: rip-mcp, port: { number: 8765 } } } }] }

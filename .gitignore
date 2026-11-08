@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+.next/
+storage/
+backend/.test-storage/
+backend/storage/
+.env
+*.tsbuildinfo
