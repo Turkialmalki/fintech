@@ -41,7 +41,7 @@ export function LoginShowcase() {
       <div className="relative flex h-full flex-col justify-end px-12 pb-12 xl:px-16">
         <p className="text-[12.5px] font-medium tracking-wide text-white/70">{pick("منظومة الرصد التنظيمي الذكي", "Regulatory Intelligence Platform")}</p>
         <h2 className="mt-3 max-w-[560px] text-[32px] font-semibold leading-[1.3] tracking-[-0.01em] xl:text-[36px]">
-          {pick("جاهزية تنظيمية أوضح لقطاع التقنية المالية", "Clearer regulatory readiness for fintech")}
+          {pick("جاهزية القطاع التقني المالي", "Fintech sector readiness")}
         </h2>
         <p className="mt-3 max-w-[520px] text-[15px] leading-relaxed text-white/75">
           {pick("نطابق نموذج العمل والوثائق مع متطلبات البنك المركزي السعودي وسدايا ومكافحة غسل الأموال باستخدام تقنية RAG، ليحصل المحلل على نتائج مسندة إلى مصادرها الرسمية.",

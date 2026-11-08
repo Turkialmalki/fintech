@@ -239,9 +239,11 @@ export default function ReadinessPage() {
       </header>
 
       {!res && (
-        <section className="relative overflow-hidden bg-[#0d1830] text-white print:hidden">
-          <div className="absolute inset-0 opacity-[0.06]" aria-hidden
-            style={{ backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
+        <section className="relative overflow-hidden bg-[#0b1220] text-white print:hidden">
+          <div className="absolute inset-0 bg-cover" style={{ backgroundImage: "url(/login/kafd-1.webp)", backgroundPosition: "50% 30%" }} aria-hidden />
+          <div className="absolute inset-0 bg-[#0b1220]/25" aria-hidden />
+          <div className="absolute inset-0 bg-gradient-to-l from-[#0b1220]/90 via-[#0b1220]/45 to-transparent ltr:bg-gradient-to-r" aria-hidden />
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0b1220]/80 to-transparent" aria-hidden />
           <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-5 py-14 lg:grid-cols-[1fr_minmax(0,500px)] lg:py-20">
             <div className="animate-rise">
               <p className="text-[13px] font-medium text-[#9fb4e8]">{pick("مجاني · دون تسجيل · لا تُحفظ ملفاتك", "Free · No sign-up · Files are not stored")}</p>
