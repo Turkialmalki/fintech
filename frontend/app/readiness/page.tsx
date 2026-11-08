@@ -18,13 +18,17 @@ import { cn } from "@/lib/utils";
 type Evidence = { document_code: string; title_ar: string; title_en: string; section: string; text: string; source_url: string } | null;
 type Req = { code: string; title_ar: string; title_en: string; severity: string; outcome: "MET" | "POTENTIAL_GAP" | "INSUFFICIENT_INFORMATION";
   missing_documents: string[]; action_ar: string; evidence: Evidence };
+type Missing = { key: string; label_ar: string; label_en: string };
+type Analysed = { filename: string; detected_type: string; assigned_types: string[]; pages: number; size_bytes: number;
+  status: "ACCEPTED" | "PARTIAL" | "REJECTED"; reason_ar: string; reason_en: string; elements_found: string[]; elements_missing: Missing[];
+  suspicious_instructions: boolean };
 type Result = {
   company_name: string; service_category: string; score: number; level: "HIGH" | "MEDIUM" | "LOW";
   counts: { met: number; gaps: number; insufficient: number; risks: number };
   requirements: Req[]; risks: { code: string; severity: string; title_ar: string; title_en: string; observed_value: unknown }[];
   key_rules: { text_ar: string; text_en: string; evidence: Evidence }[];
-  documents: { analysed: { filename: string; detected_type: string; also_covers: string[]; assigned_types: string[]; pages: number; suspicious_instructions: boolean }[];
-    required: string[]; present: string[]; missing: string[] };
+  documents: { analysed: Analysed[]; required: string[]; present: string[]; missing: string[] };
+  consistency: { ar: string; en: string }[];
   capital_used: number | null; next_steps: string[]; notice_ar: string; notice_en: string;
 };
 
@@ -93,6 +97,43 @@ function ReqRow({ r }: { r: Req }) {
   );
 }
 
+function DocChecks({ docs }: { docs: Analysed[] }) {
+  const { pick, label } = useI18n();
+  const meta = {
+    ACCEPTED: { t: pick("مقبولة", "Accepted"), cls: "bg-success-soft text-success", icon: Check },
+    PARTIAL: { t: pick("غير مكتملة", "Incomplete"), cls: "bg-warning-soft text-warning", icon: TriangleAlert },
+    REJECTED: { t: pick("مرفوضة", "Rejected"), cls: "bg-danger-soft text-danger", icon: X },
+  };
+  const n = (s: string) => docs.filter((d) => d.status === s).length;
+  return (
+    <section>
+      <h2 className="flex items-center gap-2 text-[17px] font-semibold"><FileText className="size-5 text-primary" />{pick("التحقق من الوثائق المرفوعة", "Uploaded document checks")}</h2>
+      <p className="mt-1 text-[13px] text-muted">{pick(`${n("ACCEPTED")} مقبولة · ${n("PARTIAL")} غير مكتملة · ${n("REJECTED")} مرفوضة. الوثائق المرفوضة لا تُحتسب في النتيجة.`,
+        `${n("ACCEPTED")} accepted · ${n("PARTIAL")} incomplete · ${n("REJECTED")} rejected. Rejected files are not counted.`)}</p>
+      <ul className="mt-3 flex flex-col gap-2.5">
+        {docs.map((d, i) => {
+          const m = meta[d.status];
+          return (
+            <li key={i} className="rounded-xl border border-line bg-surface px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={cn("grid size-6 place-items-center rounded-full", m.cls)}><m.icon className="size-3.5" strokeWidth={2.5} /></span>
+                <span className="ltr truncate text-[13.5px] font-medium">{d.filename}</span>
+                <span className={cn("rounded-full px-2 py-px text-[11.5px] font-medium", m.cls)}>{m.t}</span>
+                {d.assigned_types.length > 0 && <span className="text-[12.5px] text-muted">{d.assigned_types.map((x) => label("docType", x)).join("، ")}</span>}
+              </div>
+              {d.reason_ar && <p className="mt-1.5 text-[13px] text-ink-2">{pick(d.reason_ar, d.reason_en)}</p>}
+              {d.status !== "REJECTED" && d.elements_missing.length > 0 && (
+                <p className="mt-1.5 text-[12.5px] text-muted">{pick("عناصر لم نجدها:", "Elements not found:")} {d.elements_missing.map((x) => pick(x.label_ar, x.label_en)).join("، ")}</p>
+              )}
+              {d.suspicious_instructions && <p className="mt-1 text-[12.5px] text-warning">{pick("تحتوي على تعليمات مضمّنة مشبوهة وتم تجاهلها", "Contains embedded instructions, which were ignored")}</p>}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 export default function ReadinessPage() {
   const { t, pick, label, locale, setLocale, fmtNum } = useI18n();
   const Arrow = locale === "ar" ? ArrowLeft : ArrowRight;
@@ -106,9 +147,20 @@ export default function ReadinessPage() {
   const input = useRef<HTMLInputElement>(null);
   const top = useRef<HTMLDivElement>(null);
 
+  const [fileErr, setFileErr] = useState<string[]>([]);
   const addFiles = (list: FileList | null) => {
     if (!list) return;
-    const ok = Array.from(list).filter((x) => /\.(pdf|docx|txt)$/i.test(x.name));
+    const errs: string[] = [];
+    const ok: File[] = [];
+    for (const x of Array.from(list)) {
+      if (!/\.(pdf|docx|txt)$/i.test(x.name)) errs.push(pick(`${x.name}: نوع غير مدعوم — PDF أو DOCX أو TXT فقط`, `${x.name}: unsupported type — PDF, DOCX or TXT only`));
+      else if (x.size === 0) errs.push(pick(`${x.name}: الملف فارغ`, `${x.name}: the file is empty`));
+      else if (x.size > 8 * 1024 * 1024) errs.push(pick(`${x.name}: يتجاوز 8 ميجابايت`, `${x.name}: larger than 8 MB`));
+      else if (files.some((f) => f.file.name === x.name && f.file.size === x.size)) errs.push(pick(`${x.name}: مضاف مسبقاً`, `${x.name}: already added`));
+      else ok.push(x);
+    }
+    if (files.length + ok.length > 10) errs.push(pick("الحد الأقصى 10 ملفات", "At most 10 files"));
+    setFileErr(errs);
     setFiles((cur) => [...cur, ...ok.map((file) => ({ file, type: "AUTO" }))].slice(0, 10));
   };
 
@@ -219,9 +271,10 @@ export default function ReadinessPage() {
                   className={cn("mt-4 grid place-items-center rounded-xl border-2 border-dashed bg-surface px-6 py-9 text-center transition-colors", drag ? "border-primary bg-primary-soft/40" : "border-line-strong")}>
                   <span className="grid size-11 place-items-center rounded-full bg-primary-soft text-primary"><Upload className="size-5" /></span>
                   <p className="mt-3 text-[14.5px] font-medium">{pick("اسحب الملفات هنا أو", "Drag files here or")} <button type="button" onClick={() => input.current?.click()} className="text-primary hover:underline">{pick("اختر من جهازك", "browse")}</button></p>
-                  <p className="mt-1 text-[12.5px] text-muted">{pick("PDF أو DOCX أو TXT · حتى 10 ملفات · 8 ميجابايت للملف. نتعرف على نوع كل وثيقة تلقائياً.", "PDF, DOCX or TXT · up to 10 files · 8 MB each. Each document type is detected automatically.")}</p>
+                  <p className="mt-1 text-[12.5px] text-muted">{pick("PDF أو DOCX أو TXT · حتى 10 ملفات · 8 ميجابايت للملف. نتحقق من أن كل ملف وثيقة حقيقية مقروءة ونطابق محتواها مع العناصر الأساسية المطلوبة لنوعها.", "PDF, DOCX or TXT · up to 10 files · 8 MB each. We verify each file is a real, readable document and check its content against the core elements its type requires.")}</p>
                   <input ref={input} type="file" multiple accept=".pdf,.docx,.txt" className="hidden" onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
                 </div>
+                {fileErr.length > 0 && <div className="mt-3"><Notice tone="danger"><ul className="flex flex-col gap-0.5">{fileErr.map((e) => <li key={e}>{e}</li>)}</ul></Notice></div>}
                 {files.length > 0 && (
                   <ul className="mt-3 flex flex-col gap-2">
                     {files.map((x, i) => (
@@ -273,6 +326,15 @@ export default function ReadinessPage() {
 
             <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
               <div className="flex flex-col gap-8">
+                {res.documents.analysed.length > 0 && <DocChecks docs={res.documents.analysed} />}
+                {res.consistency.length > 0 && (
+                  <section>
+                    <h2 className="flex items-center gap-2 text-[17px] font-semibold"><TriangleAlert className="size-5 text-warning" />{pick("ملاحظات اتساق البيانات", "Consistency issues")}</h2>
+                    <ul className="mt-3 flex flex-col gap-2">
+                      {res.consistency.map((c, i) => <li key={i} className="rounded-xl border border-[#f1e0bd] bg-warning-soft/50 px-4 py-3 text-[13.5px]">{pick(c.ar, c.en)}</li>)}
+                    </ul>
+                  </section>
+                )}
                 {res.next_steps.length > 0 && (
                   <section>
                     <h2 className="flex items-center gap-2 text-[17px] font-semibold"><ListChecks className="size-5 text-primary" />{pick("الخطوات التالية", "Next steps")}</h2>
@@ -328,18 +390,13 @@ export default function ReadinessPage() {
                   </section>
                 )}
                 <section className="rounded-xl border border-line bg-surface p-4">
-                  <h3 className="text-[14.5px] font-semibold">{pick("الوثائق", "Documents")}</h3>
-                  {res.documents.analysed.length > 0 ? (
-                    <ul className="mt-3 flex flex-col gap-2.5">
-                      {res.documents.analysed.map((d, i) => (
-                        <li key={i} className="text-[12.5px]">
-                          <p className="ltr truncate text-start font-medium text-ink">{d.filename}</p>
-                          <p className="text-muted">{d.assigned_types.map((x) => label("docType", x)).join("، ")}</p>
-                          {d.suspicious_instructions && <p className="text-warning">{pick("تحتوي على تعليمات مضمّنة مشبوهة وتم تجاهلها", "Contains embedded instructions, which were ignored")}</p>}
-                        </li>
-                      ))}
+                  <h3 className="text-[14.5px] font-semibold">{pick("الوثائق المطلوبة", "Required documents")}</h3>
+                  {res.documents.analysed.length === 0 && <p className="mt-2 text-[12.5px] text-muted">{pick("لم تُرفع وثائق. ارفعها لرفع دقة الفحص.", "No documents uploaded. Add them for a more accurate check.")}</p>}
+                  {res.documents.present.length > 0 && (
+                    <ul className="mt-3 flex flex-col gap-1">
+                      {res.documents.present.map((m) => <li key={m} className="flex items-center gap-2 text-[12.5px] text-ink-2"><Check className="size-3.5 text-success" />{label("docType", m)}</li>)}
                     </ul>
-                  ) : <p className="mt-2 text-[12.5px] text-muted">{pick("لم تُرفع وثائق. ارفعها لرفع دقة الفحص.", "No documents uploaded. Add them for a more accurate check.")}</p>}
+                  )}
                   {res.documents.missing.length > 0 && (
                     <div className="mt-4 border-t border-line pt-3">
                       <p className="text-[12.5px] font-medium text-ink-2">{pick("وثائق مطلوبة لم تُرفق", "Required but not provided")}</p>

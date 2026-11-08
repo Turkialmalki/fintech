@@ -152,7 +152,7 @@ def extract_profile(texts: list[str]) -> dict:
     m = re.search(r"(السجل التجاري|Commercial Registration|CR)\s*(رقم|No\.?|Number)?\s*[:：]?\s*(\d{10})", norm, re.I)
     if m:
         prof["commercial_registration"] = m.group(3)
-    m = re.search(r"(رأس المال المدفوع|paid[- ]up capital)[^0-9]{0,40}" + _NUM, norm, re.I)
+    m = re.search(r"(رأس المال المدفوع|رأس المال|paid[- ]up capital|share capital)[^0-9]{0,40}" + _NUM, norm, re.I)
     if m:
         try:
             prof["paid_up_capital_sar"] = float(m.group(2).replace(",", ""))

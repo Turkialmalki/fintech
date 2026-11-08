@@ -6,6 +6,7 @@ is returned with the passage of the official-source summary it comes from.
 """
 from __future__ import annotations
 
+import hashlib
 import re
 import uuid
 from types import SimpleNamespace
@@ -21,6 +22,7 @@ from app.core.errors import AppError, RateLimited
 from app.core.ratelimit import limiter
 from app.models import DocumentType, Organization, RegulatoryChunk, RegulatoryDocument, ServiceCategory
 from app.rag.extract import extract, validate_file
+from app.services import doc_quality as dq
 from app.services import rules
 from app.services.rules import SEVERITY_ORDER
 
@@ -93,7 +95,7 @@ def classify(filename: str, text: str) -> tuple[str, list[str]]:
         s = sum(hay.count(w.lower()) for w in words) + sum(3 for w in words if w.lower() in name)
         if s:
             scores[t] = s
-    if not scores:
+    if not scores or max(scores.values()) < 2:
         return "OTHER", []
     ranked = sorted(scores.items(), key=lambda kv: -kv[1])
     primary = ranked[0][0]
@@ -106,7 +108,7 @@ def _main_org(db: Session) -> Organization:
     if org is None:
         org = db.scalar(select(Organization).order_by(Organization.created_at).limit(1))
     if org is None:
-        raise AppError("NOT_READY", "Regulatory catalogue not loaded yet", "لم يتم تحميل الكتالوج التنظيمي بعد", status_code=503)
+        raise AppError("Regulatory catalogue not loaded yet", "لم يتم تحميل الكتالوج التنظيمي بعد", status_code=503, code="NOT_READY")
     return org
 
 
@@ -132,7 +134,10 @@ def _money(v: float) -> str:
 
 def _action(r: dict) -> str:
     parts = []
-    if r["missing_documents"]:
+    inc = r.get("incomplete") or {}
+    for t, miss in inc.items():
+        parts.append(f"استكمل {DOC_LABEL_AR.get(t, t)} بإضافة: " + "، ".join(m["label_ar"] for m in miss))
+    if r["missing_documents"] and not inc:
         parts.append("قدّم: " + "، ".join(DOC_LABEL_AR.get(t, t) for t in r["missing_documents"]))
     d = r.get("detail") or ""
     m = re.search(r"paid_up_capital_sar=([0-9.]+|None) >= ([0-9.]+)", d)
@@ -161,28 +166,75 @@ async def readiness_check(
     if not limiter.hit(f"readiness:{rc.ip or 'local'}", 12, 60):
         raise RateLimited()
     if len(files) > MAX_FILES:
-        raise AppError("TOO_MANY_FILES", f"At most {MAX_FILES} files", f"الحد الأقصى {MAX_FILES} ملفات", status_code=400)
+        raise AppError(f"At most {MAX_FILES} files", f"الحد الأقصى {MAX_FILES} ملفات", status_code=400, code="TOO_MANY_FILES")
     overrides = [s.strip() for s in document_types.split(",")] if document_types else []
     org = _main_org(db)
 
     docs, analysed = [], []
+    partial: dict[str, list[dict]] = {}  # type -> missing elements, for documents that exist but are incomplete
     texts = [description] if description.strip() else []
+    seen_hashes: set[str] = set()
     for i, f in enumerate(files):
+        name = f.filename or "file"
         data = await f.read()
-        validate_file(f.filename or "", data, MAX_MB)
-        ex = extract(f.filename or "file.txt", data)
+        entry = {"filename": name, "size_bytes": len(data), "pages": 0, "detected_type": "OTHER", "assigned_types": [],
+                 "status": "REJECTED", "reason_ar": "", "reason_en": "", "elements_found": [], "elements_missing": [],
+                 "suspicious_instructions": False}
+        analysed.append(entry)
+        digest = hashlib.sha256(data).hexdigest()
+        if digest in seen_hashes:
+            entry.update(reason_ar="ملف مكرر — رُفع الملف نفسه أكثر من مرة.", reason_en="Duplicate file — the same file was uploaded twice.")
+            continue
+        seen_hashes.add(digest)
+        try:
+            validate_file(name, data, MAX_MB)
+            ex = extract(name, data)
+        except AppError as err:
+            entry.update(reason_ar=err.message_ar, reason_en=err.message)
+            continue
+        except Exception:  # corrupt, encrypted or malformed files
+            entry.update(reason_ar="تعذرت قراءة الملف؛ قد يكون تالفاً أو محمياً بكلمة مرور.",
+                         reason_en="The file could not be read; it may be corrupt or password-protected.")
+            continue
         text = "\n".join(p.text for p in ex.pages)
-        primary, also = classify(f.filename or "", text)
-        chosen = overrides[i] if i < len(overrides) and overrides[i] in DocumentType.__members__ else None
-        types = [chosen] if chosen else [primary, *also]
+        entry["pages"] = len(ex.pages)
+        ok, rar, ren = dq.readable(text)
+        if not ok:
+            entry.update(reason_ar=rar, reason_en=ren)
+            continue
         flagged = guard.scan(text)
-        for t in dict.fromkeys(types):
-            docs.append(SimpleNamespace(id=uuid.uuid4(), document_type=DocumentType(t), processing_status="PROCESSED",
-                                        extracted_text=text, filename=f.filename))
+        entry["suspicious_instructions"] = flagged.flagged
+        primary, also = classify(name, text)
+        chosen = overrides[i] if i < len(overrides) and overrides[i] in DocumentType.__members__ and overrides[i] != "OTHER" else None
+        entry["detected_type"] = primary
+        candidates = [chosen] if chosen else [primary, *also]
+        accepted, best = [], None
+        for typ in dict.fromkeys(candidates):
+            q = dq.assess(typ, text)
+            if q.status == "ACCEPTED":
+                accepted.append(typ)
+                best = best or q
+            elif q.status == "PARTIAL" and (typ == candidates[0]):
+                best = best or q
+                partial.setdefault(typ, q.missing)
+            elif best is None and typ == candidates[0]:
+                best = q
+        if accepted:
+            entry.update(status="ACCEPTED", assigned_types=accepted, elements_found=best.found, elements_missing=best.missing)
+        elif best and best.status == "PARTIAL":
+            entry.update(status="PARTIAL", assigned_types=[candidates[0]], reason_ar=best.reason_ar, reason_en=best.reason_en,
+                         elements_found=best.found, elements_missing=best.missing)
+        else:
+            entry.update(reason_ar=best.reason_ar if best else "لا يبدو الملف مرتبطاً بوثائق الترخيص المطلوبة.",
+                         reason_en=best.reason_en if best else "The file does not appear to be a licensing document.")
+            continue
+        for typ in accepted:
+            docs.append(SimpleNamespace(id=uuid.uuid4(), document_type=DocumentType(typ), processing_status="PROCESSED",
+                                        extracted_text=text, filename=name))
+            partial.pop(typ, None)
         texts.append(text)
-        analysed.append({"filename": f.filename, "size_bytes": len(data), "pages": len(ex.pages),
-                         "detected_type": primary, "also_covers": [] if chosen else also, "assigned_types": list(dict.fromkeys(types)),
-                         "characters": len(text), "suspicious_instructions": flagged.flagged})
+    for typ in {d.document_type.value for d in docs}:
+        partial.pop(typ, None)
 
     profile = rules.extract_profile(texts)
     capital = paid_up_capital_sar if paid_up_capital_sar is not None else profile.get("paid_up_capital_sar")
@@ -192,11 +244,32 @@ async def readiness_check(
                           uses_third_party_providers=uses_third_party_providers, extracted_profile=profile, documents=docs)
 
     reqs = rules.evaluate_requirements(db, app)
+    for r in reqs:  # required document exists but is incomplete -> needs information rather than absent
+        incomplete = [m for m in r["missing_documents"] if m in partial]
+        if incomplete and len(incomplete) == len(r["missing_documents"]) and "not satisfied" not in (r["detail"] or ""):
+            r["outcome"] = "INSUFFICIENT_INFORMATION"
+            r["incomplete"] = {m: partial[m] for m in incomplete}
+
+    consistency = []
+    cap_doc = profile.get("paid_up_capital_sar")
+    if paid_up_capital_sar and cap_doc and abs(cap_doc - paid_up_capital_sar) > 0.05 * paid_up_capital_sar:
+        consistency.append({"ar": f"رأس المال المُدخل ({_money(paid_up_capital_sar)} ريال) لا يطابق المذكور في الوثائق ({_money(cap_doc)} ريال).",
+                            "en": f"Entered capital (SAR {_money(paid_up_capital_sar)}) differs from the documents (SAR {_money(cap_doc)})."})
+    crs = set().union(*(dq.cr_numbers(d.extracted_text) for d in docs)) if docs else set()
+    if len(crs) > 1:
+        consistency.append({"ar": "وردت أرقام سجل تجاري مختلفة في الوثائق: " + "، ".join(sorted(crs)),
+                            "en": "Different CR numbers appear across documents: " + ", ".join(sorted(crs))})
+    cname = company_name.strip()
+    if cname and docs and len(cname) >= 4:
+        core = re.sub(r"^(شركة|مؤسسة)\s+", "", cname).split()[0].lower()
+        if not any(core in (d.extracted_text or "").lower() for d in docs):
+            consistency.append({"ar": "لم يرد اسم الشركة في أي من الوثائق المقبولة؛ تأكد أن الوثائق تخص شركتك.",
+                                "en": "The company name does not appear in any accepted document; check the documents belong to your company."})
     risks = [r for r in rules.risk_indicators(db, app) if r["code"] != "SEC-INJ-01"]
     doc_check = rules.check_required_documents(db, app)
 
     total = sum(WEIGHT.get(r["severity"], 1) for r in reqs) or 1
-    def credit(r):
+    def credit(r):  # noqa: E306
         if r["outcome"] == "MET":
             return 1.0
         if r["outcome"] == "INSUFFICIENT_INFORMATION":
@@ -222,6 +295,7 @@ async def readiness_check(
     for r in sorted(reqs, key=lambda r: (r["outcome"] == "MET", -SEVERITY_ORDER.get(r["severity"], 0))):
         items.append({"code": r["code"], "title_ar": r["title_ar"], "title_en": r["title_en"], "severity": r["severity"],
                       "outcome": r["outcome"], "missing_documents": r["missing_documents"], "action_ar": _action(r) if r["outcome"] != "MET" else "",
+                      "incomplete": r.get("incomplete", {}),
                       "evidence": ev(r["source_document_code"], r["source_section"])})
     risk_items = []
     for r in risks:
@@ -230,6 +304,9 @@ async def readiness_check(
     key_rules = [{"text_ar": ar, "text_en": en, "evidence": ev(code, sec)} for ar, en, code, sec in KEY_RULES.get(service_category.value, [])]
 
     steps = [i["action_ar"] for i in items if i["action_ar"]]
+    rejected = [a["filename"] for a in analysed if a["status"] == "REJECTED"]
+    if rejected:
+        steps.insert(0, "أعد رفع الملفات المرفوضة بنسخ نصية كاملة: " + "، ".join(rejected))
     if any(r["code"] == "RISK-HOST-01" for r in risks):
         steps.append("وثّق أساس نقل البيانات خارج المملكة وتقييم المخاطر وفق لائحة نقل البيانات، أو انقل الاستضافة إلى داخل المملكة")
     if any(r["code"] == "RISK-CO-01" for r in risks):
@@ -242,6 +319,7 @@ async def readiness_check(
         "counts": {"met": sum(r["outcome"] == "MET" for r in reqs), "gaps": sum(r["outcome"] == "POTENTIAL_GAP" for r in reqs),
                    "insufficient": sum(r["outcome"] == "INSUFFICIENT_INFORMATION" for r in reqs), "risks": len(risk_items)},
         "requirements": items, "risks": risk_items, "key_rules": key_rules,
+        "consistency": consistency,
         "documents": {"analysed": analysed, "required": doc_check["required"], "present": doc_check["present"],
                       "missing": [m["document_type"] for m in doc_check["missing"]]},
         "profile": {k: v for k, v in profile.items() if k in ("paid_up_capital_sar", "has_compliance_officer", "has_mlro",
