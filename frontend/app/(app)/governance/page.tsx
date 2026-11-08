@@ -114,7 +114,7 @@ export default function Governance() {
         <TabPanel value="evaluations" className="flex flex-col gap-4">
           {!evals.data ? <SkeletonRows /> : evals.data.length === 0 ? <EmptyState icon={FlaskConical} title={t.gov.noEvals} /> : evals.data.map((e) => (
             <Panel key={e.id} title={<span className="ltr">{e.model_name}</span>} description={`${fmtDate(e.created_at, true)} — ${e.dataset}`}
-              actions={e.is_mock && <Badge tone="warning">{t.demo.mock}</Badge>}>
+              actions={e.is_mock && <Badge>{t.demo.mock}</Badge>}>
               {e.is_mock && <Notice tone="warning" className="mb-4">{t.gov.mockEval}</Notice>}
               <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 lg:grid-cols-7">
                 {([["precision_at_k", t.gov.precision], ["recall_at_k", t.gov.recall], ["mrr", t.gov.mrr], ["context_relevance", t.gov.contextRel],

@@ -19,20 +19,21 @@ OPS = {">=": operator.ge, ">": operator.gt, "<=": operator.le, "<": operator.lt,
 
 DEFAULT_RISK_RULES: list[dict] = [
     {"code": "RISK-HOST-01", "severity": "HIGH", "field": "data_hosting_location", "op": "not_in", "value": ["KSA", "Saudi Arabia", "السعودية", "الرياض", "جدة", "الدمام"],
-     "title_ar": "استضافة بيانات العملاء خارج المملكة", "title_en": "Customer data hosted outside the Kingdom",
-     "evidence_query": "استضافة بيانات العملاء داخل المملكة"},
+     "title_ar": "استضافة البيانات خارج المملكة — يلزم إثبات ضوابط النقل وفق نظام حماية البيانات الشخصية",
+     "title_en": "Data hosted outside the Kingdom — cross-border transfer safeguards must be evidenced under the PDPL",
+     "evidence_query": "نقل البيانات الشخصية خارج المملكة مستوى حماية مناسب"},
     {"code": "RISK-TPP-01", "severity": "MEDIUM", "field": "uses_third_party_providers", "op": "==", "value": True,
      "title_ar": "الاعتماد على مزودي خدمات خارجيين في وظائف جوهرية", "title_en": "Reliance on third-party providers for core functions",
-     "evidence_query": "الإسناد إلى أطراف خارجية خطة الخروج"},
+     "evidence_query": "الأطراف الخارجية الإسناد العناية الواجبة"},
     {"code": "RISK-VOL-01", "severity": "MEDIUM", "field": "expected_monthly_volume_sar", "op": ">", "value": 50_000_000,
      "title_ar": "حجم عمليات شهري متوقع مرتفع", "title_en": "High expected monthly transaction volume",
-     "evidence_query": "مراقبة العمليات مكافحة غسل الأموال"},
+     "evidence_query": "النهج القائم على المخاطر مكافحة غسل الأموال المتابعة المستمرة"},
     {"code": "RISK-GROW-01", "severity": "MEDIUM", "profile_field": "projected_growth_pct", "op": ">", "value": 300,
      "title_ar": "نمو متوقع يتجاوز 300% في السنة الأولى", "title_en": "Projected first-year growth above 300%",
-     "evidence_query": "rapid projected growth exceeding 300 percent"},
+     "evidence_query": "الإقراض المسؤول تقييم الجدارة الائتمانية"},
     {"code": "RISK-CO-01", "severity": "HIGH", "profile_field": "has_compliance_officer", "op": "==", "value": False,
      "title_ar": "عدم وجود مسؤول التزام مستقل", "title_en": "No independent compliance officer identified",
-     "evidence_query": "مسؤول للالتزام يتمتع بالاستقلالية"},
+     "evidence_query": "مسؤول التزام بمستوى إداري مناسب"},
 ]
 
 SEVERITY_ORDER = {"INFO": 0, "LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
@@ -63,7 +64,7 @@ def check_required_documents(db: Session, app: FintechApplication) -> dict:
     missing = [{"document_type": t, "requirement_codes": codes, "failed_processing": t in failed}
                for t, codes in sorted(required.items()) if t not in present]
     return {"required": sorted(required), "present": sorted(present), "missing": missing,
-            "complete": not missing, "rule_source": "regulatory_requirements (configured, synthetic)"}
+            "complete": not missing, "rule_source": "regulatory_requirements (configured)"}
 
 
 def _cmp(actual: Any, op: str, expected: Any) -> bool | None:

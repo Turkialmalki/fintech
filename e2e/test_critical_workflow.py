@@ -19,7 +19,7 @@ from playwright.sync_api import Page, expect, sync_playwright
 
 BASE = os.getenv("E2E_BASE", "http://localhost:3000")
 API = os.getenv("E2E_API", "http://localhost:8000")
-PWD = "Demo@2026!"
+PWD = os.environ["RIP_E2E_PASSWORD"]
 
 
 def api(path: str, token: str | None = None, body: dict | None = None, method: str | None = None):
@@ -59,7 +59,7 @@ def test_critical_workflow(page: Page, tmp_path):
     company_en = f"E2E Pay {suffix} (fictional)"
 
     # 1-2. analyst authenticates and creates an application
-    ui_login(page, "analyst@rip.demo")
+    ui_login(page, "abdulaziz.alqahtani@rip.sa")
     page.get_by_role("navigation", name="main").get_by_role("link", name="طلبات التقنية المالية").click()
     page.get_by_role("link", name="طلب جديد").click()
     page.get_by_label("اسم الشركة بالعربية").fill(f"شركة اختبار {suffix} (وهمية)")
@@ -83,8 +83,8 @@ def test_critical_workflow(page: Page, tmp_path):
     expect(page.get_by_text("خطة العمل").first).to_be_visible()
 
     # 4-5. admin uploads a synthetic regulatory document and it gets indexed
-    admin = api("/auth/login", body={"email": "admin@rip.demo", "password": PWD})["access_token"]
-    ui_login(page, "admin@rip.demo")
+    admin = api("/auth/login", body={"email": "turki@rip.sa", "password": PWD})["access_token"]
+    ui_login(page, "turki@rip.sa")
     page.goto(f"{BASE}/knowledge")
     page.get_by_role("button", name="رفع وثيقة تنظيمية").click()
     page.get_by_label("رمز الوثيقة").fill(f"RIP-E2E-{suffix}")
@@ -99,7 +99,7 @@ def test_critical_workflow(page: Page, tmp_path):
     assert hits and hits[0]["document_code"] == f"RIP-E2E-{suffix}"
 
     # 6-9. analyst submits and runs the AI assessment; agents execute and call MCP tools
-    ui_login(page, "analyst@rip.demo")
+    ui_login(page, "abdulaziz.alqahtani@rip.sa")
     page.goto(app_url)
     page.get_by_role("button", name="تقديم الطلب").click()
     expect(page.get_by_text("تم تقديم الطلب")).to_be_visible()
@@ -127,7 +127,7 @@ def test_critical_workflow(page: Page, tmp_path):
 
     # 13. supervisor records the decision with explicit confirmation
     review_url = page.url
-    ui_login(page, "supervisor@rip.demo")
+    ui_login(page, "nouf.alharbi@rip.sa")
     page.goto(review_url)
     page.get_by_label("ملاحظة المراجع").fill("يُحال للمرحلة التالية بعد استكمال الملاحظات.")
     page.get_by_role("button", name="إحالة للمرحلة التالية").click()
@@ -139,7 +139,7 @@ def test_critical_workflow(page: Page, tmp_path):
     expect(page.get_by_text("تم تسجيل القرار")).to_be_visible()
 
     # 14. audit history records every relevant action
-    sup = api("/auth/login", body={"email": "supervisor@rip.demo", "password": PWD})["access_token"]
+    sup = api("/auth/login", body={"email": "nouf.alharbi@rip.sa", "password": PWD})["access_token"]
     app_id = app_url.rstrip("/").split("/")[-1]
     app = api(f"/applications/{app_id}", sup)
     assert app["status"] == "APPROVED_FOR_NEXT_REVIEW_STAGE"

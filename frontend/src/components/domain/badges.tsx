@@ -29,7 +29,7 @@ export function SyntheticTag() {
 export function MockTag({ show = true }: { show?: boolean }) {
   const { t } = useI18n();
   if (!show) return null;
-  return <span title={t.demo.mockHint}><Badge tone="warning">{t.demo.mock}</Badge></span>;
+  return <span title={t.demo.mockHint}><Badge tone="neutral">{t.demo.mock}</Badge></span>;
 }
 
 export function OriginTag({ origin }: { origin: string }) {

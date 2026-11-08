@@ -2,10 +2,10 @@
 export const ar = {
   brand: { name: "منظومة الرصد التنظيمي الذكي", short: "الرصد التنظيمي", en: "Regulatory Intelligence Platform" },
   demo: {
-    banner: "بيئة عرض مستقلة ببيانات اصطناعية — ليست نظاماً رسمياً للبنك المركزي السعودي ولا تحظى بتأييده.",
-    synthetic: "بيانات اصطناعية",
-    mock: "وضع المحاكاة",
-    mockHint: "لا يوجد نموذج لغوي متصل؛ المخرجات استخراجية وقائمة على القواعد.",
+    banner: "تقييم أولي لدعم القرار وليس استشارة قانونية أو قراراً رسمياً.",
+    synthetic: "وثيقة اختبار",
+    mock: "تحليل قائم على القواعد",
+    mockHint: "يعمل التحليل بقواعد حتمية واستخراج مباشر من المصادر الرسمية، دون نموذج لغوي.",
   },
   nav: {
     overview: "نظرة عامة", applications: "طلبات التقنية المالية", intelligence: "الذكاء التنظيمي", assessments: "التقييمات الذكية",
@@ -26,7 +26,7 @@ export const ar = {
   login: {
     title: "تسجيل الدخول", subtitle: "منصة دعم المحللين في تقييم طلبات التقنية المالية ومتابعة المتطلبات التنظيمية.",
     email: "البريد الإلكتروني", password: "كلمة المرور", submit: "دخول", submitting: "جارٍ التحقق…",
-    demoAccounts: "حسابات العرض", demoPassword: "كلمة المرور لجميع الحسابات", invalid: "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+    forgot: "لا تملك حساباً؟ تواصل مع مدير المنصة.", invalid: "البريد الإلكتروني أو كلمة المرور غير صحيحة",
     useAccount: "استخدام",
     pillars: ["بحث تنظيمي مع استشهادات قابلة للتحقق", "تقييم أولي بوكلاء ذكاء اصطناعي تحت إشراف بشري", "سجل تدقيق كامل لكل إجراء"],
   },
@@ -83,11 +83,11 @@ export const ar = {
     documents: "الوثائق", requirements: "المتطلبات المهيأة", upload: "رفع وثيقة تنظيمية", code: "رمز الوثيقة", titleAr: "العنوان بالعربية",
     titleEn: "العنوان بالإنجليزية", source: "المصدر", classification: "مستوى الوصول", public: "عام", internal: "داخلي", restricted: "مقيد",
     versionLabel: "رقم الإصدار", publication: "تاريخ النشر", effective: "تاريخ السريان", tags: "وسوم (مفصولة بفواصل)",
-    synthetic: "وثيقة اصطناعية للعرض", chunks: "مقاطع", pages: "صفحات", versions: "الإصدارات", active: "ساري", superseded: "مستبدل",
+    synthetic: "وثيقة اختبار", chunks: "مقاطع", pages: "صفحات", versions: "الإصدارات", active: "ساري", superseded: "مستبدل",
     indexed: "مفهرس", failed: "فشلت الفهرسة", restrictedHidden: "وثائق مقيدة لا تظهر لصلاحياتك", uploadedToast: "تمت فهرسة الوثيقة",
     newVersionHint: "استخدام رمز وثيقة موجود يُنشئ إصداراً جديداً ويجعل الإصدار السابق مستبدلاً.", sections: "الأقسام",
     notSupplied: "غير مُدخل", requirement: "المتطلب", appliesTo: "ينطبق على", requiredDocs: "الوثائق المطلوبة", rule: "قاعدة الفحص",
-    severity: "الأهمية", sourceSection: "القسم المصدر", allCategories: "جميع الفئات", configuredNote: "متطلبات اصطناعية مهيأة لأغراض العرض، مرتبطة بأقسام وثائقها المصدر.",
+    severity: "الأهمية", sourceSection: "القسم المصدر", allCategories: "جميع الفئات", configuredNote: "متطلبات مهيأة مستندة إلى المصادر الرسمية، ومرتبطة بأقسام وثائقها.",
     metadata: "البيانات الوصفية", embedding: "نموذج التضمين", vectorBackend: "مخزن المتجهات", sha: "بصمة الملف",
   },
   assess: {
@@ -151,7 +151,7 @@ export const ar = {
     monitoring: "حالة المراقبة", mappings: "ربط الضوابط", provider: "المزود", hosting: "الاستضافة", capabilities: "القدرات المختبرة",
     runEval: "تشغيل تقييم RAG", evalRunning: "جارٍ التقييم…", evalDone: "اكتمل التقييم", controlsNotice: "مجالات مرجعية قابلة للتهيئة لدعم المراجعة وليست دليلاً على الامتثال النظامي.",
     precision: "الدقة عند k", recall: "الاستدعاء عند k", mrr: "متوسط الرتبة العكسية", groundedness: "الاستناد إلى المصادر",
-    citation: "صحة الاستشهادات", answerRel: "صلة الإجابة", contextRel: "صلة السياق", mockEval: "تقييم في وضع المحاكاة — يقيس خط المعالجة لا نموذجاً لغوياً.",
+    citation: "صحة الاستشهادات", answerRel: "صلة الإجابة", contextRel: "صلة السياق", mockEval: "تقييم للتحليل القائم على القواعد — يقيس دقة البحث والاستخراج.",
     activeModel: "النموذج النشط", switchModel: "تبديل النموذج", probe: "اختبار القدرات", probeHint: "يرسل طلبات صغيرة للتحقق من القدرات الفعلية قبل تفعيلها.",
     notProbed: "لم تُختبر", noEvals: "لم يُشغل أي تقييم بعد.", frameworks: { NIST_AI_RMF: "إطار NIST لإدارة مخاطر الذكاء الاصطناعي", ISO_IEC_42001: "ISO/IEC 42001", SA_DATA_PROTECTION: "متطلبات حماية البيانات في المملكة (مرجعي)", FS_CYBER_TECH: "الأمن السيبراني وحوكمة التقنية في القطاع المالي (مرجعي)" },
   },
@@ -179,8 +179,8 @@ export type Dict = typeof ar;
 export const en: Dict = {
   brand: { name: "Regulatory Intelligence Platform", short: "Regulatory Intelligence", en: "Regulatory Intelligence Platform" },
   demo: {
-    banner: "Independent demonstration environment with synthetic data — not an official SAMA system and not endorsed by SAMA.",
-    synthetic: "Synthetic data", mock: "Mock mode", mockHint: "No language model is connected; outputs are extractive and rule-based.",
+    banner: "Preliminary decision support — not legal advice or an official decision.",
+    synthetic: "Test document", mock: "Rule-based analysis", mockHint: "Deterministic rules and direct extraction from official sources, without a language model.",
   },
   nav: {
     overview: "Overview", applications: "Fintech applications", intelligence: "Regulatory intelligence", assessments: "AI assessments",
@@ -198,7 +198,7 @@ export const en: Dict = {
   },
   login: {
     title: "Sign in", subtitle: "Helping analysts assess fintech applications and track regulatory requirements.", email: "Email",
-    password: "Password", submit: "Sign in", submitting: "Checking…", demoAccounts: "Demo accounts", demoPassword: "Password for all accounts",
+    password: "Password", submit: "Sign in", submitting: "Checking…", forgot: "No account? Contact your platform administrator.",
     invalid: "Incorrect email or password", useAccount: "Use",
     pillars: ["Regulatory search with verifiable citations", "AI-agent preliminary assessments under human oversight", "A complete audit trail for every action"],
   },
@@ -250,12 +250,12 @@ export const en: Dict = {
     documents: "Documents", requirements: "Configured requirements", upload: "Upload regulatory document", code: "Document code", titleAr: "Title (Arabic)",
     titleEn: "Title (English)", source: "Source", classification: "Access level", public: "Public", internal: "Internal", restricted: "Restricted",
     versionLabel: "Version label", publication: "Publication date", effective: "Effective date", tags: "Tags (comma-separated)",
-    synthetic: "Synthetic demo document", chunks: "chunks", pages: "pages", versions: "Versions", active: "Active", superseded: "Superseded",
+    synthetic: "Test document", chunks: "chunks", pages: "pages", versions: "Versions", active: "Active", superseded: "Superseded",
     indexed: "Indexed", failed: "Indexing failed", restrictedHidden: "restricted documents hidden by your permissions", uploadedToast: "Document indexed",
     newVersionHint: "Using an existing document code creates a new version and supersedes the previous one.", sections: "Sections",
     notSupplied: "Not supplied", requirement: "Requirement", appliesTo: "Applies to", requiredDocs: "Required documents", rule: "Check rule",
     severity: "Severity", sourceSection: "Source section", allCategories: "All categories",
-    configuredNote: "Synthetic requirements configured for the demo, linked to the sections of their source documents.", metadata: "Metadata",
+    configuredNote: "Configured requirements based on official sources, linked to the sections of their documents.", metadata: "Metadata",
     embedding: "Embedding model", vectorBackend: "Vector store", sha: "File fingerprint",
   },
   assess: {
@@ -316,7 +316,7 @@ export const en: Dict = {
     provider: "Provider", hosting: "Hosting", capabilities: "Probed capabilities", runEval: "Run RAG evaluation", evalRunning: "Evaluating…",
     evalDone: "Evaluation complete", controlsNotice: "Configurable reference areas to aid review — not evidence of legal compliance.",
     precision: "Precision@k", recall: "Recall@k", mrr: "MRR", groundedness: "Groundedness", citation: "Citation correctness", answerRel: "Answer relevance",
-    contextRel: "Context relevance", mockEval: "Mock-mode evaluation — measures the pipeline, not a language model.", activeModel: "Active model",
+    contextRel: "Context relevance", mockEval: "Rule-based evaluation — measures retrieval and extraction.", activeModel: "Active model",
     switchModel: "Switch model", probe: "Probe capabilities", probeHint: "Sends tiny requests to verify real capabilities before enabling them.",
     notProbed: "Not probed", noEvals: "No evaluations have run yet.",
     frameworks: { NIST_AI_RMF: "NIST AI Risk Management Framework", ISO_IEC_42001: "ISO/IEC 42001", SA_DATA_PROTECTION: "Saudi data protection (reference)", FS_CYBER_TECH: "Financial-sector cyber & technology governance (reference)" },
@@ -347,7 +347,7 @@ export const labels = {
     APPROVED_FOR_NEXT_REVIEW_STAGE: ["محال للمرحلة التالية", "Sent to next review stage"], CLOSED: ["مغلق", "Closed"],
   },
   category: { BNPL: ["اشترِ الآن وادفع لاحقاً", "Buy now, pay later"], DIGITAL_PAYMENTS: ["المدفوعات الرقمية", "Digital payments"],
-    OPEN_BANKING: ["المصرفية المفتوحة", "Open banking"], LENDING: ["التمويل الرقمي", "Digital lending"], DIGITAL_WALLET: ["المحافظ الرقمية", "Digital wallets"] },
+    OPEN_BANKING: ["المصرفية المفتوحة", "Open banking"], LENDING: ["التمويل الرقمي والمصغر", "Digital lending & microfinance"], DIGITAL_WALLET: ["المحافظ والنقود الإلكترونية", "Wallets & e-money"] },
   docType: {
     COMMERCIAL_REGISTRATION: ["السجل التجاري", "Commercial registration"], BUSINESS_PLAN: ["خطة العمل", "Business plan"],
     FINANCIAL_STATEMENTS: ["القوائم المالية المدققة", "Audited financial statements"], AML_CTF_POLICY: ["سياسة مكافحة غسل الأموال", "AML/CTF policy"],

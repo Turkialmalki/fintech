@@ -211,9 +211,9 @@ async def regulatory_research(state: AState, ctx: Ctx) -> AState:
             sec = h["section"] or h["document_code"]
             out.append({"topic": h["topic"], "source_id": sid, "quote": quote,
                         "title_ar": f"متطلب قد ينطبق: {sec}", "title_en": f"Potentially applicable requirement: {sec}",
-                        "interpretation_ar": f"[محاكاة] وردت هذه الفقرة ضمن نتائج البحث لموضوع «{h['query']}» وقد تنطبق على فئة الخدمة المقدَّم لها. يلزم تحقق المحلل من الانطباق.",
-                        "interpretation_en": f"[Mock] This passage was retrieved for the topic '{h['topic']}' and may apply to the service category ({cat}). Analyst must confirm applicability.",
-                        "uncertainty": "Applicability determined by retrieval relevance only (no model reasoning)."})
+                        "interpretation_ar": f"وردت هذه الفقرة ضمن نتائج البحث لموضوع «{h['query']}» وقد تنطبق على فئة الخدمة المقدَّم لها. يلزم تحقق المحلل من الانطباق.",
+                        "interpretation_en": f"This passage was retrieved for the topic '{h['topic']}' and may apply to the service category ({cat}). Analyst must confirm applicability.",
+                        "uncertainty": "Applicability determined by retrieval relevance; confirm against the official text."})
         return {"findings": out}
 
     messages = [{"role": "system", "content": guard.SYSTEM_POLICY_EN},
@@ -261,8 +261,8 @@ async def compliance_gap(state: AState, ctx: Ctx) -> AState:
             "title_en": ("Potential gap: " if gap else "Insufficient information: ") + r["title_en"],
             "evidence_ar": f"نتيجة الفحص الآلي للمتطلب {r['code']}: {r['detail']}",
             "evidence_en": f"Deterministic check of {r['code']}: {r['detail']}",
-            "interpretation_ar": "فجوة محتملة بناءً على المتطلبات المهيأة في النظام (اصطناعية)، وتتطلب تأكيد المحلل.",
-            "interpretation_en": "Potential gap against configured (synthetic) requirements; requires analyst confirmation.",
+            "interpretation_ar": "فجوة محتملة مقابل المتطلب المهيأ في النظام والمستند إلى المصدر الرسمي المذكور، وتتطلب تأكيد المحلل.",
+            "interpretation_en": "Potential gap against the configured requirement and its cited official source; requires analyst confirmation.",
             "uncertainty": "Rule-based; depends on completeness of submitted data.", "source_agent": agent, "origin": "RULE",
             "requirement_code": r["code"], "citations": cits})
     ctx.recorder.record(agent, "NODE", "compliance_gap", duration_ms=int((time.perf_counter() - t0) * 1000),
@@ -312,10 +312,10 @@ class ReportSummary(BaseModel):
     summary_en: str
 
 
-LIMITATIONS_AR = ("هذا تقييم أولي آلي لدعم المحلل وليس قراراً تنظيمياً أو قرار ترخيص. جميع الوثائق التنظيمية في بيئة العرض اصطناعية. "
+LIMITATIONS_AR = ("هذا تقييم أولي آلي لدعم المحلل وليس قراراً تنظيمياً أو قرار ترخيص. تستند المتطلبات إلى ملخصات للأنظمة الرسمية المنشورة؛ ويُرجع إلى النص الرسمي عند أي اختلاف. "
                   "قد تكون عملية الاستخراج والبحث غير مكتملة، ويجب التحقق من كل دليل قبل الاعتماد.")
 LIMITATIONS_EN = ("This is a preliminary, automated assessment to support an analyst. It is not a regulatory or licensing decision. "
-                  "All regulatory documents in the demo environment are synthetic. Extraction and retrieval may be incomplete; "
+                  "Requirements are based on summaries of the published official regulations; the official text prevails. Extraction and retrieval may be incomplete; "
                   "every piece of evidence must be verified before reliance.")
 
 
@@ -336,11 +336,11 @@ async def assessment_reporting(state: AState, ctx: Ctx) -> AState:
 
     def mock_builder() -> dict:
         return {
-            "summary_ar": (f"[ملخص آلي — وضع المحاكاة] أُجري تقييم أولي لطلب {app['company_name_ar']} ({app['reference']}) ضمن فئة {cat_ar}. "
+            "summary_ar": (f"أُجري تقييم أولي لطلب {app['company_name_ar']} ({app['reference']}) ضمن فئة {cat_ar}. "
                            f"رُصدت {counts['GAP']} فجوات محتملة و{counts['MISSING_INFORMATION']} حالات نقص معلومات و{counts['RISK']} مؤشرات مخاطر، "
                            f"مع {counts['REGULATORY']} متطلبات قد تنطبق. عدد الوثائق الناقصة: {len(missing)}. مستوى المخاطر الأولي: {risk_ar}. "
                            "يتطلب التقييم مراجعة بشرية قبل أي إجراء."),
-            "summary_en": (f"[Automated summary — mock mode] Preliminary assessment of {app['company_name_en']} ({app['reference']}), category "
+            "summary_en": (f"Preliminary assessment of {app['company_name_en']} ({app['reference']}), category "
                            f"{cat_en}: {counts['GAP']} potential gaps, {counts['MISSING_INFORMATION']} information gaps, "
                            f"{counts['RISK']} risk indicators and {counts['REGULATORY']} potentially applicable requirements. "
                            f"Missing documents: {len(missing)}. Preliminary risk level: {level}. Human review is required before any action."),

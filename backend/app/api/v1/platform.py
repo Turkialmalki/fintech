@@ -347,7 +347,7 @@ def dashboard(p: Principal = Depends(require("applications:read")), db: Session 
     activity = db.scalars(select(AuditLog).where(AuditLog.org_id == org, AuditLog.category.in_(["APPLICATION", "REVIEW", "AGENT", "DOCUMENT"]))
                           .order_by(AuditLog.created_at.desc()).limit(10)).all()
     return {
-        "synthetic": True,
+        "synthetic": False,
         "kpis": {"total_applications": total, "under_review": under_review, "completed_assessments": completed,
                  "requires_information": by_status.get("ADDITIONAL_INFORMATION_REQUIRED", 0), "risk_indicators": risk_ind,
                  "regulatory_documents": db.scalar(select(func.count()).select_from(RegulatoryDocument).where(
@@ -446,10 +446,10 @@ def observability(p: Principal = Depends(require("audit:read")), db: Session = D
 def system_info():
     ai = get_ai()
     return {"app": settings.app_name, "environment": settings.environment, "demo_mode": settings.demo_mode,
-            "synthetic_data": True, "ai_mock": ai.is_mock, "embedding_mock": ai.embedder.is_mock, "ai_provider": ai.cfg.provider,
+            "synthetic_data": False, "ai_mock": ai.is_mock, "embedding_mock": ai.embedder.is_mock, "ai_provider": ai.cfg.provider,
             "ai_model": ai.llm.model, "vector_backend": "pgvector" if pgvector_available() else "array",
-            "redis": limiter.healthy(), "disclaimer_ar": "منصة عرض مستقلة ببيانات اصطناعية؛ ليست نظاماً رسمياً للبنك المركزي السعودي ولا تحظى بتأييده.",
-            "disclaimer_en": "Independent demonstration platform with synthetic data; not an official SAMA system and not endorsed by SAMA."}
+            "redis": limiter.healthy(), "disclaimer_ar": "تقييم أولي لدعم القرار وليس استشارة قانونية أو قراراً رسمياً.",
+            "disclaimer_en": "Preliminary decision support — not legal advice or an official decision."}
 
 
 @router.get("/system/diagnostics", tags=["system"])

@@ -104,7 +104,7 @@ function UploadDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
   const { t, locale } = useI18n();
   const qc = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
-  const [v, setV] = useState({ document_code: "", title_ar: "", title_en: "", source: "", classification: "internal", version_label: "", publication_date: "", effective_date: "", tags: "", is_synthetic: true });
+  const [v, setV] = useState({ document_code: "", title_ar: "", title_en: "", source: "", classification: "internal", version_label: "", publication_date: "", effective_date: "", tags: "", is_synthetic: false });
   const [busy, setBusy] = useState(false);
   const submit = async () => {
     if (!file) return;

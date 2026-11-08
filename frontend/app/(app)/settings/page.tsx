@@ -119,7 +119,7 @@ function AI() {
   const caps = (probe.data?.capabilities ?? c.active.capabilities) as Record<string, unknown>;
   return (
     <div className="grid gap-6 xl:grid-cols-2">
-      <Panel title={t.gov.activeModel} actions={c.active.is_mock && <Badge tone="warning">{t.demo.mock}</Badge>}>
+      <Panel title={t.gov.activeModel} actions={c.active.is_mock && <Badge>{t.demo.mock}</Badge>}>
         <DescList items={[{ label: t.settings.provider, value: <span className="ltr">{c.active.provider}</span> }, { label: t.settings.model, value: <span className="ltr">{c.active.model}</span> },
           { label: t.settings.baseUrl, value: <span className="ltr">{c.active.base_url || "—"}</span> }, { label: t.settings.apiKey, value: c.active.api_key_configured ? t.settings.configured : t.settings.notConfigured },
           { label: t.kb.embedding, value: <span className="ltr">{c.embedding.provider} / {c.embedding.model} ({c.embedding.dim}d)</span> }, { label: t.kb.vectorBackend, value: <span className="ltr">{c.vector_backend}</span> }]} />

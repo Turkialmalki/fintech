@@ -117,11 +117,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="fixed inset-y-0 start-0 z-30 hidden w-[248px] flex-col border-e border-line bg-surface lg:flex">
         <div className="flex h-16 items-center px-5"><Logo /></div>
         <div className="flex-1 overflow-y-auto scroll-thin px-3 pb-6 pt-2"><NavList /></div>
-        <div className="border-t border-line px-5 py-3.5 text-[11.5px] leading-relaxed text-muted">
-          <span className="mb-1 inline-flex items-center gap-1.5 font-medium text-ink-2">
-            <span className="size-1.5 rounded-full bg-warning-base" aria-hidden />{t.demo.synthetic}
-          </span>
-          <p>{t.demo.banner}</p>
+        <div className="border-t border-line px-5 py-3.5">
+          <a href="/readiness" className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-medium text-primary hover:bg-primary-soft/50">
+            <span className="size-1.5 rounded-full bg-primary" aria-hidden />{pick("فحص الجاهزية العام", "Public readiness check")}
+          </a>
         </div>
       </aside>
 
@@ -153,8 +152,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="ms-auto flex items-center gap-1.5">
             {sys?.ai_mock && (
-              <span title={t.demo.mockHint} className="hidden items-center gap-1.5 rounded-full border border-[#f1e0bd] bg-warning-soft px-2.5 py-0.5 text-[12px] font-medium text-warning sm:inline-flex">
-                <span className="size-1.5 rounded-full bg-warning-base" aria-hidden />{t.demo.mock}
+              <span title={t.demo.mockHint} className="hidden items-center gap-1.5 rounded-full border border-line bg-canvas px-2.5 py-0.5 text-[12px] font-medium text-ink-2 sm:inline-flex">
+                <span className="size-1.5 rounded-full bg-success" aria-hidden />{t.demo.mock}
               </span>
             )}
             <LanguageSwitch />

@@ -84,7 +84,7 @@ def list_applications(
 def create_application(body: ApplicationIn, p: Principal = Depends(require("applications:write")), db: Session = Depends(get_db)):
     data = body.model_dump()
     data["contact_email"] = data["contact_email"] or ""
-    a = FintechApplication(org_id=p.org_id, reference=svc.new_reference(db), created_by_id=p.user_id, is_synthetic=True,
+    a = FintechApplication(org_id=p.org_id, reference=svc.new_reference(db), created_by_id=p.user_id, is_synthetic=False,
                            **{**data, "service_category": ServiceCategory(body.service_category)})
     db.add(a)
     db.flush()

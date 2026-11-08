@@ -1,12 +1,15 @@
-"""Idempotent demo seed: `python -m app.seed.run [--reset] [--no-assess]`.
+"""Idempotent seed: `python -m app.seed.run [--reset] [--no-assess]`.
 
-Everything created here is SYNTHETIC and labelled as such.
+Passwords are never stored in the repository. They come from SEED_ADMIN_PASSWORD / SEED_STAFF_PASSWORD
+when set; otherwise each account gets a random password (set it later via the admin console or SQL).
 """
 from __future__ import annotations
 
 import argparse
 import io
 import logging
+import os
+import secrets
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -33,19 +36,49 @@ from app.models import (
 )
 from app.rag.index import ingest_regulatory_document
 from app.seed.companies import COMPANIES, REQUIREMENTS
+from app.seed.version import SEED_VERSION
 from app.services import applications as apps
 
 log = logging.getLogger("rip.seed")
 DATA = Path(__file__).parent / "data"
-PASSWORD = "Demo@2026!"
+ORG_SLUG = "rip-main"
+DOMAIN = os.getenv("SEED_EMAIL_DOMAIN", "rip.sa")
 
-USERS = [
-    ("admin@rip.demo", "سارة الدوسري", "Sarah Al-Dossary", "مديرة النظام", "Platform administrator", ["admin"]),
-    ("supervisor@rip.demo", "نورة العتيبي", "Noura Al-Otaibi", "مشرفة المراجعة", "Review supervisor", ["supervisor"]),
-    ("analyst@rip.demo", "فيصل القحطاني", "Faisal Al-Qahtani", "محلل أول", "Senior analyst", ["analyst"]),
-    ("analyst2@rip.demo", "ريم الشهري", "Reem Al-Shehri", "محللة", "Analyst", ["analyst"]),
-    ("auditor@rip.demo", "خالد الزهراني", "Khalid Al-Zahrani", "مدقق داخلي", "Internal auditor", ["auditor"]),
-    ("viewer@rip.demo", "منى الغامدي", "Mona Al-Ghamdi", "مطّلعة", "Viewer", ["viewer"]),
+# key -> (email local part, name ar, name en, title ar, title en, roles)
+USERS = {
+    "admin": ("turki", "تركي المالكي", "Turki Almalki", "مؤسس المنصة ومديرها", "Founder & platform administrator", ["admin"]),
+    "supervisor": ("nouf.alharbi", "نوف الحربي", "Nouf Alharbi", "رئيسة فريق المراجعة", "Head of review", ["supervisor"]),
+    "analyst": ("abdulaziz.alqahtani", "عبدالعزيز القحطاني", "Abdulaziz Alqahtani", "محلل امتثال أول", "Senior compliance analyst", ["analyst"]),
+    "analyst2": ("lama.alshehri", "لمى الشهري", "Lama Alshehri", "محللة امتثال", "Compliance analyst", ["analyst"]),
+    "auditor": ("majed.alzahrani", "ماجد الزهراني", "Majed Alzahrani", "مدقق داخلي", "Internal auditor", ["auditor"]),
+    "viewer": ("hessa.alghamdi", "حصة الغامدي", "Hessa Alghamdi", "إدارة المخاطر — اطلاع", "Risk management (read-only)", ["viewer"]),
+}
+
+
+def email_for(key: str) -> str:
+    return f"{USERS[key][0]}@{DOMAIN}"
+
+
+def _password(key: str) -> str:
+    env = os.getenv("SEED_ADMIN_PASSWORD") if key == "admin" else os.getenv("SEED_STAFF_PASSWORD")
+    return env or secrets.token_urlsafe(24)
+
+
+DOCS = [
+    ("SAMA-BNPL", "SAMA-BNPL.txt", "قواعد تنظيم شركات الشراء الآن والدفع لاحقاً", "Rules Regulating Buy-Now-Pay-Later Companies",
+     "https://rulebook.sama.gov.sa/en/node/6523", "2023.12", date(2023, 12, 1), ["bnpl"]),
+    ("SAMA-PAYMENTS", "SAMA-PAYMENTS.txt", "نظام المدفوعات وخدماتها ولائحته التنفيذية — متطلبات الترخيص", "Law of Payments and Payment Services — licensing requirements",
+     "https://www.sama.gov.sa/en-US/FAQs/Pages/PaymentsFAQs.aspx", "2022", None, ["payments", "e-money"]),
+    ("SAMA-OPENBANKING", "SAMA-OPENBANKING.txt", "متطلبات خدمة بدء الدفع ومعلومات الحساب وإطار المصرفية المفتوحة", "Payment initiation, account information and the Open Banking Framework",
+     "https://rulebook.sama.gov.sa/en/entiresection/1544", "2024", date(2022, 11, 1), ["open-banking"]),
+    ("SAMA-MICROFINANCE", "SAMA-MICROFINANCE.txt", "قواعد تنظيم شركات التمويل الاستهلاكي المصغر والتمويل الجماعي بالدين", "Consumer Microfinance and Debt Crowdfunding Rules",
+     "https://rulebook.sama.gov.sa/en/node/2574", "2019", date(2019, 12, 10), ["lending"]),
+    ("SAMA-CSF", "SAMA-CSF.txt", "إطار الأمن السيبراني", "SAMA Cyber Security Framework",
+     "https://rulebook.sama.gov.sa/node/3837", "1.0", date(2017, 5, 24), ["cyber"]),
+    ("SAMA-AML", "SAMA-AML.txt", "نظام مكافحة غسل الأموال وتمويل الإرهاب ودليل البنك المركزي", "AML/CTF Laws and SAMA AML/CTF Guide",
+     "https://rulebook.sama.gov.sa/node/791", "2017", date(2017, 10, 25), ["aml"]),
+    ("SDAIA-PDPL", "SDAIA-PDPL.txt", "نظام حماية البيانات الشخصية ولائحته التنفيذية", "Personal Data Protection Law and Implementing Regulations",
+     "https://sdaia.gov.sa/en/SDAIA/about/Documents/Personal%20Data%20English%20V2-23April2023-%20Reviewed-.pdf", "2023", date(2023, 9, 14), ["pdpl", "data"]),
 ]
 
 GOV_CONTROLS = [
@@ -67,7 +100,7 @@ def make_docx(path: Path) -> bytes:
     import docx
 
     d = docx.Document()
-    d.core_properties.title = "Synthetic Conduct Guidelines for BNPL Services"
+    d.core_properties.title = path.stem
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
@@ -86,7 +119,7 @@ def make_pdf(path: Path) -> bytes:
 
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
-    c.setTitle("Synthetic Supervisory Note on Cloud Hosting and Outsourcing")
+    c.setTitle(path.stem)
     y = 800
     for line in path.read_text(encoding="utf-8").splitlines():
         if line.startswith("Section ") and y < 760:
@@ -124,65 +157,51 @@ def seed_identity(db) -> dict:
         db.add(role)
         roles[code] = role
     db.flush()
-    org = db.scalar(select(Organization).where(Organization.slug == "demo-supervision"))
+    org = db.scalar(select(Organization).where(Organization.slug == ORG_SLUG))
     if org is None:
-        org = Organization(name_ar="وحدة الرقابة التجريبية", name_en="Demo Supervisory Unit", slug="demo-supervision", is_synthetic=True)
+        org = Organization(name_ar="وحدة الامتثال والجاهزية التنظيمية", name_en="Compliance & Regulatory Readiness Unit", slug=ORG_SLUG, is_synthetic=False)
         db.add(org)
-    org_b = db.scalar(select(Organization).where(Organization.slug == "tenant-b"))
-    if org_b is None:
-        org_b = Organization(name_ar="جهة تجريبية ثانية", name_en="Second Demo Tenant", slug="tenant-b", is_synthetic=True)
-        db.add(org_b)
+    accounts = [(k, email_for(k), *USERS[k][1:], org) for k in USERS]
+    org_b = None
+    if os.getenv("SEED_SECOND_TENANT") == "1":  # used by the test suite to verify tenant isolation
+        org_b = db.scalar(select(Organization).where(Organization.slug == "partner-tenant"))
+        if org_b is None:
+            org_b = Organization(name_ar="جهة شريكة", name_en="Partner Tenant", slug="partner-tenant", is_synthetic=False)
+            db.add(org_b)
+        accounts.append(("tenant_b", f"admin@partner.{DOMAIN}", "مدير الجهة الشريكة", "Partner Admin", "مدير", "Admin", ["admin"], org_b))
     db.flush()
     users = {}
-    for email, ar, en, tar, ten, rcodes in USERS + [("admin@tenantb.demo", "مدير الجهة الثانية", "Tenant B Admin", "مدير", "Admin", ["admin"])]:
+    for key, email, ar, en, tar, ten, rcodes, o in accounts:
         u = db.scalar(select(User).where(User.email == email))
         if u is None:
-            u = User(email=email, full_name_ar=ar, full_name_en=en, title_ar=tar, title_en=ten, password_hash=hash_password(PASSWORD),
-                     org_id=org_b.id if email.endswith("tenantb.demo") else org.id)
+            u = User(email=email, full_name_ar=ar, full_name_en=en, title_ar=tar, title_en=ten,
+                     password_hash=hash_password(_password(key)), org_id=o.id)
             db.add(u)
         u.roles = [roles[c] for c in rcodes]
-        users[email] = u
+        users[key] = u
     db.flush()
     return {"org": org, "org_b": org_b, "users": users}
 
 
 def seed_regulatory(db, admin) -> None:
     p = principal_from_user(admin)
-    v1 = (DATA / "RIP-SYN-001.txt").read_text(encoding="utf-8").replace(
-        "خمسة ملايين ريال سعودي (5,000,000 ريال)", "ثلاثة ملايين ريال سعودي (3,000,000 ريال)")
-    common = dict(source="RIP demonstration corpus (synthetic)", is_synthetic=True)
-    ingest_regulatory_document(db, p, filename="RIP-SYN-001-v1.txt", data=v1.encode(), document_code="RIP-SYN-001",
-                               title_ar="الإطار التجريبي لتقييم طلبات خدمات التقنية المالية (اصطناعية)",
-                               title_en="Synthetic Fintech Application Assessment Framework", classification="internal",
-                               version_label="2025.1", publication_date=date(2025, 1, 15), effective_date=date(2025, 3, 1), tags=["framework"], **common)
-    ingest_regulatory_document(db, p, filename="RIP-SYN-001.txt", data=(DATA / "RIP-SYN-001.txt").read_bytes(), document_code="RIP-SYN-001",
-                               title_ar="الإطار التجريبي لتقييم طلبات خدمات التقنية المالية (اصطناعية)",
-                               title_en="Synthetic Fintech Application Assessment Framework", classification="internal",
-                               version_label="2026.1", publication_date=date(2026, 2, 1), effective_date=date(2026, 4, 1), tags=["framework"], **common)
-    ingest_regulatory_document(db, p, filename="RIP-SYN-002.docx", data=make_docx(DATA / "RIP-SYN-002.txt"), document_code="RIP-SYN-002",
-                               title_ar="إرشادات سلوكية تجريبية لخدمات الشراء الآن والدفع لاحقاً (اصطناعية)",
-                               title_en="Synthetic BNPL Conduct Guidelines", classification="public", version_label="2026.1",
-                               publication_date=date(2026, 1, 10), tags=["bnpl", "conduct"], **common)
-    ingest_regulatory_document(db, p, filename="RIP-SYN-003.txt", data=(DATA / "RIP-SYN-003.txt").read_bytes(), document_code="RIP-SYN-003",
-                               title_ar="الدليل التجريبي لخدمات المصرفية المفتوحة (اصطناعية)", title_en="Synthetic Open Banking Guide",
-                               classification="internal", version_label="2025.2", effective_date=date(2025, 9, 1), tags=["open-banking"], **common)
-    ingest_regulatory_document(db, p, filename="RIP-SYN-004.pdf", data=make_pdf(DATA / "RIP-SYN-004.txt"), document_code="RIP-SYN-004",
-                               title_ar="مذكرة رقابية تجريبية حول الاستضافة السحابية والإسناد (مقيدة، اصطناعية)",
-                               title_en="Synthetic Supervisory Note on Cloud Hosting and Outsourcing", classification="restricted",
-                               version_label="2026.1", tags=["cloud", "outsourcing"], **common)
+    for code, fname, tar, ten, url, ver, pub, tags in DOCS:
+        ingest_regulatory_document(db, p, filename=fname, data=(DATA / fname).read_bytes(), document_code=code,
+                                   title_ar=tar, title_en=ten, classification="public", version_label=ver,
+                                   publication_date=pub, tags=tags, source=url, is_synthetic=False)
     for r in REQUIREMENTS:
         if not db.scalar(select(RegulatoryRequirement).where(RegulatoryRequirement.code == r["code"], RegulatoryRequirement.org_id == admin.org_id)):
-            db.add(RegulatoryRequirement(org_id=admin.org_id, is_synthetic=True, **r))
+            db.add(RegulatoryRequirement(org_id=admin.org_id, is_synthetic=False, **r))
     db.flush()
 
 
 def seed_governance(db, org) -> None:
     if db.scalar(select(AIModel).where(AIModel.org_id == org.id)):
         return
-    m_mock = AIModel(org_id=org.id, name="Deterministic mock", provider="mock", model_id="deterministic-mock-v1", version="1",
+    m_mock = AIModel(org_id=org.id, name="Rule-based analysis engine", provider="mock", model_id="rules-engine-v1", version="1",
                      hosting="self_hosted", owner="فريق المنصة", approval_status="APPROVED", deployment_status="PRODUCTION",
                      is_active=True, capabilities={"json_schema": True, "tool_calling": False, "probed": True},
-                     notes="Used when no model credentials are configured. Produces extractive, rule-based output only.")
+                     notes="Deterministic checks and extractive summaries; used when no language model is configured.")
     m_qwen = AIModel(org_id=org.id, name="Qwen 2.5 72B Instruct", provider="qwen", model_id="Qwen/Qwen2.5-72B-Instruct", version="2.5",
                      hosting="self_hosted", base_url_env="QWEN_BASE_URL", context_window=32768, owner="فريق الذكاء الاصطناعي",
                      approval_status="PENDING", deployment_status="STAGING", notes="Self-hosted via vLLM. Capabilities not yet probed.")
@@ -190,7 +209,7 @@ def seed_governance(db, org) -> None:
                       version="3.3", hosting="self_hosted", base_url_env="LLAMA_BASE_URL", context_window=131072,
                       owner="فريق الذكاء الاصطناعي", approval_status="PENDING", deployment_status="NOT_DEPLOYED",
                       notes="Alternative provider. Requires --enable-auto-tool-choice on vLLM for tool calling.")
-    m_emb = AIModel(org_id=org.id, name="Hashing n-gram embedder (mock)", provider="mock", model_id="hashing-ngram-v1", purpose="embedding",
+    m_emb = AIModel(org_id=org.id, name="Hashing n-gram embedder", provider="mock", model_id="hashing-ngram-v1", purpose="embedding",
                     hosting="self_hosted", owner="فريق المنصة", approval_status="APPROVED", deployment_status="PRODUCTION", is_active=True,
                     notes="Lexical feature hashing; replace with a multilingual embedding model (e.g. BGE-M3) in production.")
     db.add_all([m_mock, m_qwen, m_llama, m_emb])
@@ -216,13 +235,12 @@ def seed_governance(db, org) -> None:
     ])
     for fw, ref, tar, ten, dar, den in GOV_CONTROLS:
         db.add(GovernanceControl(org_id=org.id, framework=fw, reference=ref, title_ar=tar, title_en=ten, description_ar=dar, description_en=den))
-    db.add(SystemSetting(org_id=None, key="platform.disclaimer", value={"value": "synthetic-demo"},
-                         description="Demo environment: all regulatory content is synthetic."))
+    db.add(SystemSetting(org_id=None, key="seed.version", value={"value": SEED_VERSION}, description="Seeded content version."))
 
 
 def seed_applications(db, ctx) -> dict:
     org, users = ctx["org"], ctx["users"]
-    analyst = users["analyst@rip.demo"]
+    analyst = users["analyst"]
     p = principal_from_user(analyst)
     created = {}
     now = datetime.now(timezone.utc)
@@ -234,8 +252,8 @@ def seed_applications(db, ctx) -> dict:
             continue
         fields = {k: v for k, v in c.items() if k not in ("key", "documents", "status")}
         fields["service_category"] = ServiceCategory(fields["service_category"])
-        a = FintechApplication(org_id=org.id, reference=apps.new_reference(db), created_by_id=analyst.id, is_synthetic=True,
-                               assigned_analyst_id=(users["analyst@rip.demo"] if i % 2 == 0 else users["analyst2@rip.demo"]).id, **fields)
+        a = FintechApplication(org_id=org.id, reference=apps.new_reference(db), created_by_id=analyst.id, is_synthetic=False,
+                               assigned_analyst_id=(users["analyst"] if i % 2 == 0 else users["analyst2"]).id, **fields)
         a.created_at = now - timedelta(days=40 - i * 6)
         db.add(a)
         db.flush()
@@ -243,7 +261,7 @@ def seed_applications(db, ctx) -> dict:
         for dtype, body in c["documents"].items():
             apps.upload_document(db, p, a, filename=f"{c['key']}_{dtype.lower()}.txt", data=body.encode(), document_type=DocumentType(dtype))
         if c["status"] != "DRAFT":
-            apps.transition(db, p, a, S.SUBMITTED, reason="seed")
+            apps.transition(db, p, a, S.SUBMITTED, reason="submitted by applicant")
         created[c["key"]] = a
     db.flush()
     return created
@@ -256,8 +274,8 @@ def seed_assessments(ctx, created) -> None:
     from app.services import assessments as asmt
 
     with session_scope() as db:
-        analyst = principal_from_user(db.get(User, ctx["users"]["analyst@rip.demo"].id))
-        supervisor = principal_from_user(db.get(User, ctx["users"]["supervisor@rip.demo"].id))
+        analyst = principal_from_user(db.get(User, ctx["users"]["analyst"].id))
+        supervisor = principal_from_user(db.get(User, ctx["users"]["supervisor"].id))
     for key in ("tamweel", "openbank", "remit", "lend"):
         run_id = create_run(analyst, created[key].id)
         execute_run(run_id, analyst)
@@ -274,12 +292,13 @@ def seed_assessments(ctx, created) -> None:
 
 
 def seed_assessments_from_db() -> None:
-    """Re-run the demo assessments for already-seeded data (e.g. after a failed first run)."""
+    """Re-run the seeded assessments for already-seeded data (e.g. after a failed first run)."""
     from app.models import AgentRun
 
     with session_scope() as db:
-        org = db.scalar(select(Organization).where(Organization.slug == "demo-supervision"))
-        users = {u.email: u for u in db.scalars(select(User).where(User.org_id == org.id))}
+        org = db.scalar(select(Organization).where(Organization.slug == ORG_SLUG))
+        by_email = {u.email: u for u in db.scalars(select(User).where(User.org_id == org.id))}
+        users = {k: by_email[email_for(k)] for k in USERS if email_for(k) in by_email}
         created = {}
         for c in COMPANIES:
             a = db.scalar(select(FintechApplication).where(FintechApplication.org_id == org.id,
@@ -300,7 +319,7 @@ def main() -> None:
         reset()
     with session_scope() as db:
         ctx = seed_identity(db)
-        admin = ctx["users"]["admin@rip.demo"]
+        admin = ctx["users"]["admin"]
         seeded = db.scalar(select(RegulatoryRequirement.id).where(RegulatoryRequirement.org_id == admin.org_id).limit(1))
         if not seeded:
             seed_regulatory(db, admin)
@@ -309,14 +328,14 @@ def main() -> None:
         key_note = ""
         if not db.scalar(select(McpApiKey).where(McpApiKey.org_id == ctx["org"].id)):
             raw, prefix, h = generate_api_key()
-            db.add(McpApiKey(org_id=ctx["org"].id, name="Demo read-only key", key_prefix=prefix, key_hash=h,
-                             user_id=ctx["users"]["analyst@rip.demo"].id, scopes=["read"]))
+            db.add(McpApiKey(org_id=ctx["org"].id, name="Read-only integration key", key_prefix=prefix, key_hash=h,
+                             user_id=ctx["users"]["analyst"].id, scopes=["read"]))
             key_note = raw
     if not a.no_assess and not seeded:
         seed_assessments(ctx, created)
-    print("Seed complete. Demo password for all users:", PASSWORD)
-    if key_note:
-        print("Demo MCP read-only API key (shown once):", key_note)
+    log.info("seed complete (version %s)", SEED_VERSION)
+    if key_note and os.getenv("SEED_PRINT_KEYS") == "1":
+        print("MCP read-only API key (shown once):", key_note)
 
 
 if __name__ == "__main__":

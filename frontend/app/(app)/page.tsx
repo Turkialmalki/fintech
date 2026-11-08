@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 import { HBars, Strip, TrendLine } from "@/components/charts/charts";
-import { MockTag, Severity, SyntheticTag } from "@/components/domain/badges";
+import { MockTag, Severity } from "@/components/domain/badges";
 import { Select, Segmented } from "@/components/ui/field";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/feedback";
 import { PageHeader, Panel } from "@/components/ui/layout";
@@ -66,7 +66,7 @@ export default function Dashboard() {
       <PageHeader
         title={me ? `${t.dashboard.greeting}، ${pick(me.full_name_ar.split(" ")[0], me.full_name_en.split(" ")[0])}` : t.dashboard.title}
         subtitle={t.dashboard.subtitle}
-        meta={<><SyntheticTag /><MockTag show={!!d?.ai.is_mock} /></>}
+        meta={<MockTag show={!!d?.ai.is_mock} />}
         actions={<>
           <Select aria-label={t.apps.category} value={category} onChange={(e) => setCategory(e.target.value)} className="min-w-44">
             <option value="">{t.common.all}</option>

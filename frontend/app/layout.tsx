@@ -5,7 +5,7 @@ import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: { default: "منظومة الرصد التنظيمي الذكي", template: "%s · RIP" },
-  description: "Saudi Fintech Regulatory Intelligence Platform — independent demonstration with synthetic data.",
+  description: "Saudi fintech regulatory readiness: check your business model against SAMA, SDAIA and AML requirements, with every requirement linked to its official source.",
   robots: { index: false, follow: false },
 };
 

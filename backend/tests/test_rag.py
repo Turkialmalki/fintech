@@ -27,16 +27,16 @@ def test_chunks_do_not_cross_sections():
 
 
 def test_hybrid_search_returns_real_content(client, h):
-    r = client.post("/api/v1/regulatory/search", json={"query": "ما الحد الأدنى لرأس المال المدفوع للمحافظ الرقمية"}, headers=h["analyst"]).json()
+    r = client.post("/api/v1/regulatory/search", json={"query": "ما الحد الأدنى لرأس مال شركة الشراء الآن والدفع لاحقاً"}, headers=h["analyst"]).json()
     top = r["results"][0]
-    assert top["document_code"] == "RIP-SYN-001" and "المادة 2" in top["section"]
-    assert "خمسة ملايين" in top["text"]  # active version (2026.1)
-    assert top["version_label"] == "2026.1"
+    assert top["document_code"] == "SAMA-BNPL" and "المادة 5" in top["section"]
+    assert "خمسة ملايين" in top["text"]
+    assert top["source"].startswith("https://rulebook.sama.gov.sa")
 
 
 def test_english_search(client, h):
     r = client.post("/api/v1/regulatory/search", json={"query": "late payment charges compound", "mode": "keyword"}, headers=h["analyst"]).json()
-    assert r["results"][0]["document_code"] == "RIP-SYN-002"
+    assert r["results"][0]["document_code"] == "TEST-EN"
 
 
 def test_version_aware_retrieval(client, h):
@@ -58,11 +58,10 @@ def test_permission_aware_retrieval(client, h):
 
 
 def test_rag_answer_citations_are_verified(client, h):
-    r = client.post("/api/v1/rag/query", json={"query": "ما مدة صلاحية موافقة العميل في المصرفية المفتوحة؟"}, headers=h["analyst"]).json()
+    r = client.post("/api/v1/rag/query", json={"query": "هل يجب حذف بيانات المستخدم عند سحب الموافقة في خدمة معلومات الحساب؟"}, headers=h["analyst"]).json()
     assert r["insufficient_evidence"] is False
     assert r["citations"] and all(c["verified"] for c in r["citations"])
-    assert r["citations"][0]["document_code"] == "RIP-SYN-003"
-    assert r["sources"][0]["page_number"] == 1  # pagination preserved from the form-feed document
+    assert r["citations"][0]["document_code"] == "SAMA-OPENBANKING"
 
 
 def test_rag_insufficient_evidence(client, h):

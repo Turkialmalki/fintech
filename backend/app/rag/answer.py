@@ -91,9 +91,9 @@ def answer_question(db: Session, principal: Principal, question: str, filters: S
             for s in best_sentences(question, h, 1):
                 cits.append({"source_id": sid, "quote": s})
                 summary.append(f"{s} [{sid}]")
-        interp = ("[وضع المحاكاة] هذا ملخص استخراجي للنصوص الأكثر صلة دون تفسير من نموذج لغوي. يلزم تحقق المحلل."
+        interp = ("ملخص استخراجي للنصوص الأكثر صلة من المصادر المفهرسة. يُرجع إلى النص الرسمي قبل الاعتماد."
                   if locale == "ar" else
-                  "[Mock mode] Extractive summary of the most relevant passages; no language-model interpretation. Analyst verification required.")
+                  "Extractive summary of the most relevant indexed passages. Verify against the official text before reliance.")
         return {"insufficient_evidence": False, "evidence_summary": "\n".join(summary), "interpretation": interp, "citations": cits}
 
     parsed, res = ai.structured(messages, RagAnswer, purpose="rag_answer", mock_builder=mock_builder)

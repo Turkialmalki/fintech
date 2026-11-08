@@ -3,7 +3,7 @@ import io
 from tests.conftest import app_id_by_name
 
 
-def _create(client, headers, name="Falcon Pay (fictional)"):
+def _create(client, headers, name="Falcon Pay"):
     r = client.post("/api/v1/applications", headers=headers, json={
         "company_name_ar": "شركة صقر للمدفوعات (وهمية)", "company_name_en": name, "service_category": "DIGITAL_PAYMENTS",
         "commercial_registration": "1010000001", "paid_up_capital_sar": 4000000, "data_hosting_location": "الرياض"})
@@ -42,10 +42,10 @@ def test_create_upload_submit_flow(client, h):
 
 
 def test_comments_and_assignment(client, h):
-    a = _create(client, h["analyst"], "Comment Co (fictional)")
+    a = _create(client, h["analyst"], "Comment Co")
     assert client.post(f"/api/v1/applications/{a['id']}/comments", json={"body": "ملاحظة"}, headers=h["analyst"]).status_code == 201
     users = client.get("/api/v1/users", headers=h["supervisor"]).json()
-    analyst = next(u for u in users if u["email"] == "analyst2@rip.demo")
+    analyst = next(u for u in users if u["email"] == "lama.alshehri@rip.sa")
     r = client.post(f"/api/v1/applications/{a['id']}/assign", json={"analyst_id": analyst["id"]}, headers=h["supervisor"])
     assert r.json()["assigned_analyst_id"] == analyst["id"]
     assert client.post(f"/api/v1/applications/{a['id']}/assign", json={"analyst_id": analyst["id"]}, headers=h["analyst"]).status_code == 403
@@ -53,7 +53,7 @@ def test_comments_and_assignment(client, h):
 
 def test_review_edit_creates_version_and_decisions(client, h):
     queue = client.get("/api/v1/reviews/queue", headers=h["analyst"]).json()
-    draft = next(d for d in queue if d["company_name_en"].startswith("Tamweelak"))
+    draft = next(d for d in queue if d["company_name_en"].startswith("Dana"))
     full = client.get(f"/api/v1/assessments/{draft['id']}", headers=h["analyst"]).json()
     f0 = full["findings"][0]
     r = client.patch(f"/api/v1/assessments/{draft['id']}", headers=h["analyst"], json={

@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy import text
 
-from app.api.v1 import applications, assessments, auth, platform, regulatory
+from app.api.v1 import applications, assessments, auth, platform, readiness, regulatory
 from app.core.config import settings
 from app.core.db import engine, session_scope
 from app.core.errors import install_error_handlers
@@ -23,7 +23,7 @@ log = logging.getLogger("rip.api")
 
 app = FastAPI(
     title="RIP — Saudi Fintech Regulatory Intelligence Platform API",
-    description="Independent demonstration platform (synthetic data). Not an official SAMA system. "
+    description="Regulatory readiness and assessment API. "
                 "AI output is decision support only; consequential decisions require a human user.",
     version="1.0.0",
     openapi_url=f"{settings.api_prefix}/openapi.json",
@@ -78,7 +78,7 @@ async def request_context(request: Request, call_next):
 
 
 api = APIRouter(prefix=settings.api_prefix)
-for r in (auth.router, applications.router, regulatory.router, assessments.router, platform.router):
+for r in (auth.router, applications.router, regulatory.router, assessments.router, platform.router, readiness.router):
     api.include_router(r)
 app.include_router(api)
 

@@ -5,6 +5,7 @@ Usage: python scripts/screenshots.py [--base http://localhost:3000] [--out docs/
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import urllib.request
 from pathlib import Path
@@ -17,7 +18,7 @@ VIEWPORTS = {"desktop": (1440, 900), "tablet": (900, 1180), "mobile": (390, 844)
 
 
 def token(api: str, email: str) -> tuple[str, str]:
-    req = urllib.request.Request(f"{api}/api/v1/auth/login", data=json.dumps({"email": email, "password": "Demo@2026!"}).encode(),
+    req = urllib.request.Request(f"{api}/api/v1/auth/login", data=json.dumps({"email": email, "password": os.environ["RIP_E2E_PASSWORD"]}).encode(),
                                  headers={"Content-Type": "application/json"})
     j = json.load(urllib.request.urlopen(req))
     return j["access_token"], j["refresh_token"]
@@ -40,7 +41,7 @@ def main() -> None:
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    access, refresh = token(a.api, "supervisor@rip.demo")
+    access, refresh = token(a.api, "nouf.alharbi@rip.sa")
     draft = first(a.api, access, "/reviews/queue")
     app_id = first(a.api, access, "/applications?q=Tamweelak")
     run_id = first(a.api, access, "/assessments/runs")

@@ -9,10 +9,10 @@ def test_login_and_me(client, h):
 
 
 def test_login_failure_is_generic_and_audited(client, h):
-    r = client.post("/api/v1/auth/login", json={"email": "analyst@rip.demo", "password": "wrong"})
+    r = client.post("/api/v1/auth/login", json={"email": "abdulaziz.alqahtani@rip.sa", "password": "wrong"})
     assert r.status_code == 401
     assert r.json()["error"]["code"] == "UNAUTHORIZED"
-    r2 = client.post("/api/v1/auth/login", json={"email": "nobody@rip.demo", "password": "wrong"})
+    r2 = client.post("/api/v1/auth/login", json={"email": "nobody@rip.sa", "password": "wrong"})
     assert r2.json()["error"]["message"] == r.json()["error"]["message"]  # no user enumeration
     logs = client.get("/api/v1/audit", params={"action": "login_failed"}, headers=h["admin"]).json()
     assert logs["total"] >= 1
@@ -24,7 +24,7 @@ def test_missing_and_invalid_token(client):
 
 
 def test_refresh_token_cannot_be_used_as_access(client):
-    r = client.post("/api/v1/auth/login", json={"email": "viewer@rip.demo", "password": "Demo@2026!"}).json()
+    r = client.post("/api/v1/auth/login", json={"email": "hessa.alghamdi@rip.sa", "password": "Test@2026!"}).json()
     assert client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {r['refresh_token']}"}).status_code == 401
     new = client.post("/api/v1/auth/refresh", json={"refresh_token": r["refresh_token"]})
     assert new.status_code == 200
@@ -42,7 +42,7 @@ def test_rbac_permissions(client, h):
 
 
 def test_tenant_isolation_applications(client, h):
-    app_id = app_id_by_name(client, h["analyst"], "Tamweelak")
+    app_id = app_id_by_name(client, h["analyst"], "Dana")
     assert client.get(f"/api/v1/applications/{app_id}", headers=h["tenant_b"]).status_code == 404
     assert client.get("/api/v1/applications", headers=h["tenant_b"]).json()["total"] == 0
     assert client.patch(f"/api/v1/applications/{app_id}", json={"city": "x"}, headers=h["tenant_b"]).status_code == 404
@@ -67,7 +67,7 @@ def test_tenant_isolation_mcp_tools(principal):
     with session_scope() as db:
         app_id = str(db.scalar(select(FintechApplication.id).limit(1)))
     with pytest.raises(NotFound):
-        execute("get_fintech_application", {"application_id": app_id}, principal("admin@tenantb.demo"))
+        execute("get_fintech_application", {"application_id": app_id}, principal("admin@partner.rip.sa"))
 
 
 def test_security_headers_and_request_id(client):

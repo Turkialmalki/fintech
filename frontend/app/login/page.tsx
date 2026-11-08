@@ -1,11 +1,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Languages } from "lucide-react";
+import { ArrowLeft, ArrowRight, Languages } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { ProductPreview } from "@/components/marketing/preview";
 import { LogoMark } from "@/components/shell/logo";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
@@ -13,13 +15,9 @@ import { Notice } from "@/components/ui/feedback";
 import { api, ApiError, tokens } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
-const DEMO = [
-  { email: "analyst@rip.demo", role: "analyst" }, { email: "supervisor@rip.demo", role: "supervisor" },
-  { email: "admin@rip.demo", role: "admin" }, { email: "auditor@rip.demo", role: "auditor" },
-];
-
 function LoginForm() {
-  const { t, locale, setLocale, label, pick } = useI18n();
+  const { t, locale, setLocale, pick } = useI18n();
+  const Arrow = locale === "ar" ? ArrowLeft : ArrowRight;
   const router = useRouter();
   const params = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +25,7 @@ function LoginForm() {
     email: z.string().email(pick("أدخل بريداً إلكترونياً صحيحاً", "Enter a valid email")),
     password: z.string().min(1, pick("أدخل كلمة المرور", "Enter your password")),
   });
-  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema) });
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema) });
 
   const onSubmit = handleSubmit(async (v) => {
     setError(null);
@@ -61,50 +59,25 @@ function LoginForm() {
             </Field>
             <Button type="submit" size="lg" loading={isSubmitting} className="mt-2">{isSubmitting ? t.login.submitting : t.login.submit}</Button>
           </form>
-          <div className="mt-10 border-t border-line pt-5">
-            <p className="text-[13px] font-medium text-ink-2">{t.login.demoAccounts}</p>
-            <p className="mt-0.5 text-[12.5px] text-muted">{t.login.demoPassword}: <span className="ltr font-medium text-ink">Demo@2026!</span></p>
-            <ul className="mt-3 grid grid-cols-2 gap-2">
-              {DEMO.map((d) => (
-                <li key={d.email}>
-                  <button type="button" onClick={() => { setValue("email", d.email); setValue("password", "Demo@2026!"); }}
-                    className="w-full rounded-md border border-line px-3 py-2 text-start hover:border-primary/40 hover:bg-primary-soft/40">
-                    <span className="block text-[13px] font-medium">{label("role", d.role)}</span>
-                    <span className="ltr block truncate text-[11.5px] text-muted">{d.email}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <p className="mt-4 text-center text-[12.5px] text-muted">{t.login.forgot}</p>
+          <Link href="/readiness" className="group mt-10 flex items-center gap-4 rounded-xl border border-line bg-surface p-4 transition-colors hover:border-primary/40 hover:bg-primary-soft/30">
+            <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary"><Arrow className="size-[18px] transition-transform group-hover:-translate-x-0.5 rtl:group-hover:translate-x-0.5" /></span>
+            <span>
+              <span className="block text-[14px] font-semibold">{pick("افحص جاهزية شركتك مجاناً", "Check your company's readiness")}</span>
+              <span className="mt-0.5 block text-[12.5px] text-muted">{pick("دون تسجيل — ارفع وثائقك واحصل على الفجوات والخطوات التالية خلال دقائق.", "No sign-up — upload your documents and get gaps and next steps in minutes.")}</span>
+            </span>
+          </Link>
         </div>
-        <p className="text-[12px] leading-relaxed text-muted">{t.demo.banner}</p>
       </section>
 
-      {/* Brand panel: the product's core idea — every finding traced to its exact source */}
-      <aside className="relative hidden overflow-hidden bg-ink text-white lg:flex lg:flex-col lg:justify-center lg:px-16">
-        <div className="absolute inset-0 opacity-[0.07]" aria-hidden
-          style={{ backgroundImage: "linear-gradient(#fff 1px, transparent 1px)", backgroundSize: "100% 28px" }} />
-        <div className="relative max-w-[520px] animate-rise">
-          <p className="text-[13px] text-[#9fb4e8]">{pick("مثال توضيحي من بيانات اصطناعية", "Illustrative example from synthetic data")}</p>
-          <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] p-5">
-            <div className="flex items-center gap-2 text-[12px] text-[#f0b9bc]">
-              <span className="inline-flex items-end gap-[2px]" aria-hidden>{[0, 1, 2, 3].map((i) => <span key={i} className={`w-[3px] rounded-full ${i < 3 ? "bg-[#ef7c82]" : "bg-white/20"}`} style={{ height: 6 + i * 3 }} />)}</span>
-              {pick("فجوة محتملة · أهمية عالية", "Potential gap · High")}
-            </div>
-            <p className="mt-2 text-[17px] font-medium leading-snug">{pick("رأس المال المدفوع أقل من الحد المهيأ لخدمات الشراء الآن والدفع لاحقاً", "Paid-up capital below the configured minimum for BNPL services")}</p>
-            <div className="mt-4 border-s-2 border-[#5B86F0] ps-4">
-              <p className="text-[13.5px] leading-relaxed text-white/80">{pick("«يجب ألا يقل رأس المال المدفوع لمقدمي خدمات الشراء الآن والدفع لاحقاً والتمويل الرقمي عن عشرة ملايين ريال سعودي»", "“Paid-up capital for BNPL and digital lending providers must not be less than SAR 10 million”")}</p>
-              <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-white/55">
-                <span className="ltr">RIP-SYN-001 · v2026.1</span><span>{pick("المادة 2", "Article 2")}</span>
-                <span className="inline-flex items-center gap-1 text-[#7fd4b2]">✓ {pick("اقتباس متحقق منه", "Quote verified")}</span>
-              </p>
-            </div>
-          </div>
-          <ul className="mt-10 flex flex-col gap-3.5">
-            {t.login.pillars.map((p) => (
-              <li key={p} className="flex items-center gap-3 text-[14.5px] text-white/85"><span className="h-px w-6 bg-[#5B86F0]" aria-hidden />{p}</li>
-            ))}
-          </ul>
+      {/* Brand panel: what a readiness result looks like */}
+      <aside className="relative hidden overflow-hidden bg-[#0d1830] text-white lg:flex lg:flex-col lg:justify-center lg:px-14 xl:px-20">
+        <div className="absolute inset-0 opacity-[0.06]" aria-hidden
+          style={{ backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
+        <div className="relative animate-rise">
+          <h2 className="max-w-[520px] text-[30px] font-semibold leading-[1.3] tracking-[-0.01em]">{pick("اعرف جاهزيتك التنظيمية قبل أن تتقدم بطلب الترخيص", "Know your regulatory readiness before you apply")}</h2>
+          <p className="mt-3 max-w-[500px] text-[14.5px] leading-relaxed text-white/65">{pick("مطابقة نموذج عملك ووثائقك مع متطلبات البنك المركزي السعودي وسدايا ومكافحة غسل الأموال، مع رابط للمصدر الرسمي لكل متطلب.", "Match your business model and documents against SAMA, SDAIA and AML requirements — every requirement linked to its official source.")}</p>
+          <div className="mt-9"><ProductPreview /></div>
         </div>
       </aside>
     </div>

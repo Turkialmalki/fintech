@@ -32,14 +32,20 @@ docker compose up --build       # postgres+pgvector, redis, migrations+seed, api
 open http://localhost:3000      # Arabic UI
 ```
 
-Demo accounts (password `Demo@2026!`): `analyst@rip.demo`, `supervisor@rip.demo`, `admin@rip.demo`, `auditor@rip.demo`,
-`viewer@rip.demo`, and `admin@tenantb.demo` (a second tenant, to see isolation).
+Seeded accounts: `turki@rip.sa` (admin), `nouf.alharbi@rip.sa` (supervisor), `abdulaziz.alqahtani@rip.sa` and
+`lama.alshehri@rip.sa` (analysts), `majed.alzahrani@rip.sa` (auditor), `hessa.alghamdi@rip.sa` (viewer). Passwords are never
+committed: set `SEED_ADMIN_PASSWORD` / `SEED_STAFF_PASSWORD` before the first start, otherwise each account gets a random
+password. The public readiness check at `/readiness` needs no account.
+
+The knowledge base contains summaries of published Saudi regulations (SAMA BNPL rules, Payments law and implementing
+regulations, open banking, consumer microfinance, the SAMA Cyber Security Framework, AML/CTF laws and the PDPL), each with
+its official source link. The official text prevails over any summary.
 
 ## Deploy on Vercel
 
 The repo root contains a `vercel.json` using **Vercel Services**: `frontend/` (Next.js) and `backend/` (FastAPI) run in one
 project, with `/api/*` routed to the backend. On Vercel the backend automatically uses serverless-safe defaults:
-database-backed file storage, synchronous agent runs, no Redis, and **first-request bootstrap** (migrations + synthetic seed).
+database-backed file storage, synchronous agent runs, no Redis, and **first-request bootstrap** (migrations + seed; reseeds when `app/seed/version.py` changes, keeping existing passwords).
 
 1. Vercel → **Add New → Project** → import this GitHub repository (framework is detected from `vercel.json`).
 2. Vercel → project → **Integrations → Supabase** → connect a Supabase project (pgvector is used automatically).
