@@ -452,6 +452,31 @@ def system_info():
             "disclaimer_en": "Independent demonstration platform with synthetic data; not an official SAMA system and not endorsed by SAMA."}
 
 
+@router.get("/system/diagnostics", tags=["system"])
+def diagnostics():
+    """Public, secret-free deployment check: which credentials are present and whether the DB is reachable."""
+    import os
+    import re
+
+    from sqlalchemy import text as sql_text
+
+    from app.core.bootstrap import _done as bootstrapped
+    from app.core.db import engine
+
+    out: dict = {"env_present": {k: bool(os.getenv(k)) for k in ("DATABASE_URL", "POSTGRES_URL", "SUPABASE_JWT_SECRET", "JWT_SECRET", "VERCEL")},
+                 "serverless": settings.serverless, "auto_bootstrap": settings.auto_bootstrap, "bootstrapped": bootstrapped}
+    try:
+        with engine.connect() as c:
+            out["database"] = "ok"
+            out["pgvector"] = bool(c.execute(sql_text("SELECT 1 FROM pg_extension WHERE extname='vector'")).first())
+            out["search_path"] = c.execute(sql_text("SHOW search_path")).scalar()
+            out["tables"] = c.execute(sql_text("SELECT count(*) FROM information_schema.tables WHERE table_schema='rip'")).scalar()
+    except Exception as e:
+        out["database"] = "error"
+        out["database_error"] = re.sub(r"://[^@\s]+@", "://***@", f"{type(e).__name__}: {e}")[:400]
+    return out
+
+
 @router.get("/system/settings", tags=["system"])
 def get_settings_api(p: Principal = Depends(require("settings:manage")), db: Session = Depends(get_db)):
     rows = db.scalars(select(SystemSetting).where((SystemSetting.org_id == p.org_id) | SystemSetting.org_id.is_(None))).all()

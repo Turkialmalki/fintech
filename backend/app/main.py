@@ -42,7 +42,7 @@ async def request_context(request: Request, call_next):
     rid = request.headers.get("x-request-id") or uuid.uuid4().hex
     request.state.request_id = rid[:64]
     path = request.url.path
-    if settings.auto_bootstrap and path.startswith(settings.api_prefix):
+    if settings.auto_bootstrap and path.startswith(settings.api_prefix) and not path.endswith("/system/diagnostics"):
         from starlette.concurrency import run_in_threadpool
 
         from app.core.bootstrap import ensure_bootstrapped
