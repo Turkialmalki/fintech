@@ -39,6 +39,9 @@ def ensure_bootstrapped() -> None:
         from app.core.db import engine
 
         with engine.connect() as conn:
+            # The `rip` schema keeps app tables out of Supabase's auto-exposed `public` schema.
+            conn.execute(text("CREATE SCHEMA IF NOT EXISTS rip"))
+            conn.commit()
             got = conn.execute(text("SELECT pg_try_advisory_lock(7351001)")).scalar()
             if not got:
                 log.info("another instance is bootstrapping")

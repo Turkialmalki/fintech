@@ -86,9 +86,39 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 
+def _from_platform_env(s: Settings) -> Settings:
+    """Adopt credentials injected by platform integrations, so secrets never have to be copied by hand.
+
+    - Supabase ↔ Vercel integration injects POSTGRES_URL (pooler). We switch it to session mode (port 5432),
+      the psycopg driver, and the dedicated `rip` schema (not exposed by Supabase's REST API).
+    - If JWT_SECRET is not set, derive an application-specific key from SUPABASE_JWT_SECRET (HMAC, never reused directly).
+    """
+    import hashlib
+    import hmac
+    import os
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+    if not os.getenv("DATABASE_URL") and os.getenv("POSTGRES_URL"):
+        u = urlsplit(os.environ["POSTGRES_URL"])
+        host = u.hostname or ""
+        port = 5432 if "pooler.supabase.com" in host else (u.port or 5432)
+        netloc = u.netloc.rsplit("@", 1)[0] + f"@{host}:{port}"
+        q = {k: v for k, v in parse_qsl(u.query) if k in ("sslmode",)}
+        q.setdefault("sslmode", "require")
+        q["options"] = "-csearch_path=rip,extensions"
+        s.database_url = urlunsplit(("postgresql+psycopg", netloc, u.path or "/postgres", urlencode(q), ""))
+    default_secret = "change-me-local-only-secret-change-me"
+    if s.jwt_secret.get_secret_value() == default_secret and os.getenv("SUPABASE_JWT_SECRET"):
+        derived = hmac.new(os.environ["SUPABASE_JWT_SECRET"].encode(), b"rip-api-jwt-v1", hashlib.sha256).hexdigest()
+        s.jwt_secret = SecretStr(derived)
+    if s.environment == "production" and s.jwt_secret.get_secret_value() == default_secret:
+        raise RuntimeError("JWT_SECRET must be set in production")
+    return s
+
+
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    return _from_platform_env(Settings())
 
 
 settings = get_settings()
